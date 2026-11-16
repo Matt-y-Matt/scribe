@@ -1,0 +1,7 @@
+{
+  "fixture": "meeting-custore-weekly.jsonl",
+  "title": "Custore weekly team meeting",
+  "mode": "group",
+  "agenda": ["CLA quote", "Supplier delays", "Designer hire"],
+  "participants": ["Matt", "Zach", "Ant", "Kabs"]
+}
