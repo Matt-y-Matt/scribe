@@ -44,3 +44,14 @@ jobs:
       - run: pnpm check
 
       - run: pnpm test
+
+      # The manifest is embedded by the linker (src-tauri/build.rs). A binary
+      # without it exits at load, so prove the real app executable stays up.
+      - name: Smoke test, the app starts
+        shell: pwsh
+        run: |
+          cargo build --manifest-path src-tauri/Cargo.toml
+          $app = Start-Process -FilePath src-tauri/target/debug/scribe.exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($app.HasExited) { throw "scribe.exe exited within 8 s, code $($app.ExitCode)" }
+          Stop-Process -Id $app.Id -Force

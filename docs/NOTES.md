@@ -9,6 +9,11 @@ Working notes: what is known, what is not verified, and what is still open. Deci
 - `pnpm replay fixtures/meeting-custore-weekly.jsonl --speed 10`: 46 segments, 381.2 s of meeting in 38.1 s.
 - `pnpm screenshot`: writes `home-empty.light.png` and `home-empty.dark.png`; reviewed against UI_SPEC §1, §3.1 and §5.
 
+### CI on Windows
+- Run 2 (`7b04e91`): `pnpm check` green, vitest green, then `cargo test` failed at load with `STATUS_ENTRYPOINT_NOT_FOUND` (0xc0000139). Cause: Tauri imports Common Controls v6 functions, and tauri-build links the manifest that requests them into the app binary only (`embed_resource::compile` → bins), so no test binary that links Tauri can start.
+- Fix: `src-tauri/build.rs` builds with `WindowsAttributes::new_without_app_manifest()` and has the linker embed `src-tauri/windows-app-manifest.xml` into every artifact (`/MANIFEST:EMBED`). Tauri's own `build.rs` does the same for its tests. CI also builds the app executable and checks it stays up for 8 s.
+- Stable cargo on CI warns that `tauri-plugin-sql` and `tauri-plugin-global-shortcut` are unused dependencies. Expected until M2 and M3 register them.
+
 ### Not verified
 - **The app has not been launched.** M0 was built in a Linux container, which can compile, lint and test the Rust core but cannot open the Windows app. Run `pnpm tauri dev` once on the PC and confirm the window opens on Home.
 - Settings persistence through `tauri-plugin-store` (`src/lib/settings.ts`) is unit-tested with a mock only; it first runs for real under `pnpm tauri dev`.
