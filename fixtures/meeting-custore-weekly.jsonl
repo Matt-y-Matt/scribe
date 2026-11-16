@@ -1,0 +1,46 @@
+{"id":"s001","t0":0.0,"t1":7.8,"speaker":"Matt","text":"Okay let's start. Today we've got three things: the CLA quote, the supplier delays from Guangzhou, and whether we hire a designer."}
+{"id":"s002","t0":8.1,"t1":11.0,"speaker":"Zach","text":"Can we add the Christmas pop-up? It's not urgent but it's coming."}
+{"id":"s003","t0":11.2,"t1":14.5,"speaker":"Matt","text":"Let's see if we have time at the end. CLA first. Kabs, where are we?"}
+{"id":"s004","t0":15.0,"t1":31.2,"speaker":"Kabs","text":"So Ross came back. They want two hundred and eighty polos and the same number of caps to start, but he's asking if we can do it under forty dollars a set because the previous vendor quoted thirty eight."}
+{"id":"s005","t0":31.5,"t1":40.3,"speaker":"Zach","text":"Thirty eight is below our floor on embroidered polos. Our cost on the polo alone is nineteen, caps are nine, plus the credit platform."}
+{"id":"s006","t0":40.6,"t1":52.0,"speaker":"Matt","text":"Right, so the platform is a separate line. I don't want to bundle it into the unit price. Let's quote the apparel at forty two a set and the platform as a one-time setup."}
+{"id":"s007","t0":52.3,"t1":58.9,"speaker":"Kabs","text":"He'll push back. Ross is measured on cost per head. Can I offer forty if they commit to a second batch?"}
+{"id":"s008","t0":59.1,"t1":66.4,"speaker":"Matt","text":"Yes. Forty two list, forty if they sign for a replenishment batch in Q2. That's the decision."}
+{"id":"s009","t0":66.8,"t1":72.0,"speaker":"Zach","text":"And the setup fee for the platform, are we saying eight thousand like the other vendor?"}
+{"id":"s010","t0":72.2,"t1":80.5,"speaker":"Matt","text":"Seven five. We're cheaper and we're faster. I'll write the quote. Kabs, can you call Ross tomorrow and confirm the headcount, I want the real number not the estimate."}
+{"id":"s011","t0":80.7,"t1":83.0,"speaker":"Kabs","text":"Yep, I'll call him tomorrow morning."}
+{"id":"s012","t0":83.4,"t1":92.1,"speaker":"Ant","text":"On the artwork, their logo file is a JPG from WhatsApp again. I ran it through the new upscaler, the big shapes are fine but the small text under the logo is garbage."}
+{"id":"s013","t0":92.3,"t1":97.8,"speaker":"Matt","text":"Retype the text. Don't send anything with upscaled text to the embroiderer, we've been burned before."}
+{"id":"s014","t0":98.0,"t1":104.6,"speaker":"Ant","text":"Okay. I can have the vector and the mockups by Wednesday if Kabs gets me the Pantone from Ross."}
+{"id":"s015","t0":104.8,"t1":107.2,"speaker":"Kabs","text":"I'll ask when I call him."}
+{"id":"s016","t0":108.0,"t1":119.7,"speaker":"Matt","text":"Good. So CLA: quote at forty two, forty with a second batch, platform at seven five setup, I write the quote this week, Kabs confirms headcount and Pantone tomorrow, Ant sends mockups Wednesday. Next, suppliers."}
+{"id":"s017","t0":120.5,"t1":138.0,"speaker":"Zach","text":"The Guangzhou factory pushed the polo lead time from eighteen days to twenty eight. They say it's the new fabric mill. The caps are fine, still twelve days. The problem is the UDO order lands exactly in that window."}
+{"id":"s018","t0":138.3,"t1":145.1,"speaker":"Matt","text":"Can we split? Caps from Guangzhou, polos from the Dongguan guys we tested in August?"}
+{"id":"s019","t0":145.4,"t1":156.9,"speaker":"Zach","text":"Dongguan was good on quality but their minimum is three hundred per colour. UDO is four colours at eighty each. We'd be paying for stock we don't need."}
+{"id":"s020","t0":157.2,"t1":163.0,"speaker":"Kabs","text":"Could we ask UDO to drop to two colours? Their committee was flexible last time."}
+{"id":"s021","t0":163.3,"t1":172.8,"speaker":"Matt","text":"Worth asking but don't promise. Zach, get the written lead times from both factories by Friday, and the actual minimums in writing, not WeChat voice notes."}
+{"id":"s022","t0":173.0,"t1":175.5,"speaker":"Zach","text":"Fine. Friday."}
+{"id":"s023","t0":176.0,"t1":188.4,"speaker":"Ant","text":"By the way the office aircon is dead again. The guy came on Monday and it died on Tuesday. It's thirty one degrees in the back room, I can't work on the heat press."}
+{"id":"s024","t0":188.6,"t1":196.2,"speaker":"Zach","text":"The landlord's contractor is useless. We should just get our own guy and bill the landlord."}
+{"id":"s025","t0":196.5,"t1":203.0,"speaker":"Kabs","text":"My uncle does aircon. He can come Thursday but he'll charge, like, three hundred for a regas."}
+{"id":"s026","t0":203.2,"t1":212.7,"speaker":"Matt","text":"Okay hold on, this is important but it's not what we're here for. Let's put a pin in the aircon and I'll deal with it after. Back to suppliers."}
+{"id":"s027","t0":213.0,"t1":225.9,"speaker":"Matt","text":"If Dongguan can't do small runs, the fallback is to tell UDO the polos ship a week later and give them the caps on time. Zach, when you have the numbers, draft the two options for UDO and I'll send it."}
+{"id":"s028","t0":226.1,"t1":228.3,"speaker":"Zach","text":"Okay."}
+{"id":"s029","t0":229.0,"t1":242.6,"speaker":"Matt","text":"Designer. We've talked about this three times. Ant is doing design, production and customer artwork and it's too much. The question is a full-time junior or a freelancer on retainer."}
+{"id":"s030","t0":242.9,"t1":256.1,"speaker":"Ant","text":"Honestly a freelancer is fine for mockups but the customer artwork clean-up needs someone here, because it's back and forth with the sales guys five times a day."}
+{"id":"s031","t0":256.4,"t1":268.0,"speaker":"Kabs","text":"Agree. Half my delays are waiting on artwork. If someone sat next to me the CLA stuff would have been done last week."}
+{"id":"s032","t0":268.3,"t1":280.7,"speaker":"Zach","text":"A junior full time is maybe three two, three five a month. With CPF closer to four. Can we afford that before the CLA deal closes?"}
+{"id":"s033","t0":281.0,"t1":294.5,"speaker":"Matt","text":"If CLA closes at the numbers we just agreed, yes. If not, no. So the decision is: we hire a full-time junior designer, conditional on CLA signing. I'll put together the budget this week."}
+{"id":"s034","t0":294.8,"t1":303.2,"speaker":"Ant","text":"Can I write the job description? I know what the role actually needs. I'll have it to you by Friday."}
+{"id":"s035","t0":303.4,"t1":305.0,"speaker":"Matt","text":"Yes please."}
+{"id":"s036","t0":305.6,"t1":316.9,"speaker":"Zach","text":"One more on CLA, sorry. Ross mentioned they might want name embroidery on the polos. Per person. That changes the quote and the lead time."}
+{"id":"s037","t0":317.1,"t1":326.4,"speaker":"Matt","text":"That's a different product. Kabs, when you call Ross, ask if names are in scope. If yes, it's a separate line at, what, three dollars a name?"}
+{"id":"s038","t0":326.6,"t1":331.0,"speaker":"Zach","text":"Three fifty. The thread changes per piece, it's slow."}
+{"id":"s039","t0":331.2,"t1":334.8,"speaker":"Matt","text":"Three fifty then. Kabs, add it to your call."}
+{"id":"s040","t0":335.0,"t1":336.5,"speaker":"Kabs","text":"Got it."}
+{"id":"s041","t0":337.0,"t1":349.3,"speaker":"Zach","text":"Christmas pop-up. Jewel asked if we want the kiosk again, nine days in December, same spot. Last year we did eleven thousand in sales but it was exhausting."}
+{"id":"s042","t0":349.5,"t1":358.9,"speaker":"Matt","text":"We're out of time. Pin it. Let's do a separate thirty-minute call on the pop-up next week, Zach can you set it up?"}
+{"id":"s043","t0":359.1,"t1":361.0,"speaker":"Zach","text":"Sure, I'll send an invite."}
+{"id":"s044","t0":361.5,"t1":372.0,"speaker":"Matt","text":"Okay. Summary. Decisions: CLA at forty two, forty with a second batch, platform setup seven five, names at three fifty if in scope. Designer hire conditional on CLA. Actions: Kabs calls Ross tomorrow, Ant mockups Wednesday, Zach lead times Friday, Ant job description Friday, me the quote and the designer budget this week."}
+{"id":"s045","t0":372.3,"t1":376.8,"speaker":"Ant","text":"And the aircon. Someone has to deal with the aircon."}
+{"id":"s046","t0":377.0,"t1":381.2,"speaker":"Matt","text":"Pinned. I'll message the landlord today. Thanks all."}

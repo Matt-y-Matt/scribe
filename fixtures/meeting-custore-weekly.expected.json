@@ -1,0 +1,37 @@
+{
+  "fixture": "meeting-custore-weekly.jsonl",
+  "agenda": ["CLA quote", "Supplier delays", "Designer hire"],
+  "notes": "Golden expectations for the replay test. Scoring rules are in docs/TEST_PLAN.md §Golden test. Topic titles may differ in wording; matching is by segment coverage, not exact title. Card text may differ; matching is by kind + owner + segment overlap.",
+  "topics": [
+    { "key": "cla", "header": "CLA quote", "must_cover_segments": ["s004", "s005", "s006", "s007", "s008", "s009", "s010", "s012", "s013", "s014", "s016", "s036", "s037", "s038", "s039"] },
+    { "key": "suppliers", "header": "Supplier delays", "must_cover_segments": ["s017", "s018", "s019", "s020", "s021", "s027"] },
+    { "key": "designer", "header": "Designer hire", "must_cover_segments": ["s029", "s030", "s031", "s032", "s033", "s034"] },
+    { "key": "aircon", "header": null, "off_agenda": true, "expect_pin_suggestion_between": ["s023", "s026"], "must_cover_segments": ["s023", "s024", "s025"] },
+    { "key": "popup", "header": null, "off_agenda": true, "expect_pin_suggestion_between": ["s041", "s042"], "must_cover_segments": ["s041"] }
+  ],
+  "cards": [
+    { "kind": "decision", "topic": "cla", "segments": ["s008"], "gist": "quote 42 per set, 40 if replenishment batch signed in Q2" },
+    { "kind": "decision", "topic": "cla", "segments": ["s010"], "gist": "platform setup fee 7,500 one-time" },
+    { "kind": "decision", "topic": "cla", "segments": ["s037", "s038", "s039"], "gist": "name embroidery as a separate line at 3.50 per name, if in scope" },
+    { "kind": "action", "topic": "cla", "owner": "Kabs", "due_hint": "tomorrow", "segments": ["s010", "s011"], "gist": "call Ross, confirm real headcount" },
+    { "kind": "action", "topic": "cla", "owner": "Kabs", "due_hint": "tomorrow", "segments": ["s014", "s015", "s037", "s039"], "gist": "ask Ross for Pantone and whether names are in scope" },
+    { "kind": "action", "topic": "cla", "owner": "Ant", "due_hint": "Wednesday", "segments": ["s014"], "gist": "vector logo and mockups" },
+    { "kind": "action", "topic": "cla", "owner": "Matt", "due_hint": "this week", "segments": ["s010", "s016"], "gist": "write the CLA quote" },
+    { "kind": "note", "topic": "cla", "segments": ["s012", "s013"], "gist": "logo came as JPG; upscaled small text unusable; retype text before embroidery" },
+    { "kind": "note", "topic": "suppliers", "segments": ["s017"], "gist": "Guangzhou polo lead time 18 to 28 days; caps still 12; clashes with UDO window" },
+    { "kind": "note", "topic": "suppliers", "segments": ["s019"], "gist": "Dongguan minimum 300 per colour; UDO is 4 colours x 80" },
+    { "kind": "action", "topic": "suppliers", "owner": "Zach", "due_hint": "Friday", "segments": ["s021", "s022"], "gist": "written lead times and minimums from both factories" },
+    { "kind": "action", "topic": "suppliers", "owner": "Zach", "segments": ["s027", "s028"], "gist": "draft the two options for UDO (split or ship polos a week late)" },
+    { "kind": "decision", "topic": "designer", "segments": ["s033"], "gist": "hire a full-time junior designer, conditional on CLA signing" },
+    { "kind": "action", "topic": "designer", "owner": "Matt", "due_hint": "this week", "segments": ["s033"], "gist": "designer budget" },
+    { "kind": "action", "topic": "designer", "owner": "Ant", "due_hint": "Friday", "segments": ["s034", "s035"], "gist": "write the job description" },
+    { "kind": "action", "topic": "popup", "owner": "Zach", "segments": ["s042", "s043"], "gist": "set up a 30-minute call on the Christmas pop-up next week" },
+    { "kind": "action", "topic": "aircon", "owner": "Matt", "due_hint": "today", "segments": ["s046"], "gist": "message the landlord about the aircon" }
+  ],
+  "pins_at_end": ["aircon", "popup"],
+  "never": [
+    "no card attributes an action to the wrong owner (Zach must not own the job description; Ant must not own lead times)",
+    "no topic is deleted or renamed by the engine without a confirmation",
+    "no card is created from segment s001 or s044 alone (agenda statement and recap are not new facts)"
+  ]
+}
