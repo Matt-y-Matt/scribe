@@ -1,0 +1,15 @@
+node_modules
+dist
+*.local
+*.log
+
+# pnpm screenshot output; review the images, do not commit them
+.screenshots/
+
+# Playwright
+test-results/
+playwright-report/
+
+.vscode/*
+.idea
+.DS_Store

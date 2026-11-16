@@ -1,0 +1,6 @@
+# LF everywhere, on Windows too: prettier, the fixtures and the generated
+# src/ipc.ts are compared byte for byte in CI.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.icns binary

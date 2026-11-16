@@ -1,0 +1,42 @@
+[package]
+name = "scribe"
+version = "0.1.0"
+description = "Scribe, a meeting secretary that sits in the room"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[lib]
+# The `_lib` suffix keeps the lib name distinct from the bin name, which
+# matters on Windows (https://github.com/rust-lang/cargo/issues/8519).
+name = "scribe_lib"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+
+tauri-plugin-log = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-store = "2"
+# Added in M0 per docs/BUILD_PLAN.md; registered when their milestone needs them
+# (sql: M2 store, global-shortcut: M3 hold-to-talk).
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-plugin-global-shortcut = "2"
+
+# Typed Rust <-> TS boundary (src/ipc.rs -> ../src/ipc.ts)
+specta = { version = "=2.0.0-rc.22", features = ["derive"] }
+tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+specta-typescript = "=0.0.9"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

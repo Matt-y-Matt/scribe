@@ -1,0 +1,62 @@
+/*
+ * Design tokens — docs/UI_SPEC.md §1. This table is the only place colours live.
+ * Light is the default. Dark applies when the OS prefers it, or when the app
+ * forces it with <html data-theme="dark">; data-theme="light" forces light.
+ * --on-accent (text on an accent fill) is the one addition to the spec table:
+ * white on the dark accent is 3.08:1, below AA (see docs/DECISIONS.md).
+ */
+:root {
+  color-scheme: light;
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --surface-2: #f3f3f1;
+  --border: #e4e4e1;
+  --text: #1a1a1a;
+  --text-muted: #6b6b68;
+  --accent: #2d5bff;
+  --accent-soft: #e8edff;
+  --on-accent: #ffffff;
+  --record: #dc2626;
+  --action: #b45309;
+  --research: #0f766e;
+  --quote: #fde68a;
+  --pin: #6b6b68;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #141416;
+  --surface: #1c1c1f;
+  --surface-2: #232327;
+  --border: #2c2c31;
+  --text: #ececea;
+  --text-muted: #9a9a96;
+  --accent: #6b8cff;
+  --accent-soft: #1e2a4a;
+  --on-accent: #141416;
+  --record: #ef4444;
+  --action: #f59e0b;
+  --research: #2dd4bf;
+  --quote: #78350f;
+  --pin: #9a9a96;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #141416;
+    --surface: #1c1c1f;
+    --surface-2: #232327;
+    --border: #2c2c31;
+    --text: #ececea;
+    --text-muted: #9a9a96;
+    --accent: #6b8cff;
+    --accent-soft: #1e2a4a;
+    --on-accent: #141416;
+    --record: #ef4444;
+    --action: #f59e0b;
+    --research: #2dd4bf;
+    --quote: #78350f;
+    --pin: #9a9a96;
+  }
+}

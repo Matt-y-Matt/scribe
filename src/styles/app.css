@@ -1,0 +1,102 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter/wght.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';
+@import './tokens.css';
+
+/*
+ * Tailwind is narrowed to the UI_SPEC §1 vocabulary: the default palette, type
+ * scale, radii, shadows and blurs are removed so only the tokens can be used.
+ */
+@theme inline {
+  --color-*: initial;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-record: var(--record);
+  --color-action: var(--action);
+  --color-research: var(--research);
+  --color-quote: var(--quote);
+  --color-pin: var(--pin);
+
+  --font-*: initial;
+  --font-sans: 'Inter Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'Cascadia Mono', Consolas, monospace;
+
+  /* 18 page title · 15 section/header · 13 body · 12 secondary · 11 meta */
+  --text-*: initial;
+  --text-title: 18px;
+  --text-header: 15px;
+  --text-body: 13px;
+  --text-secondary: 12px;
+  --text-meta: 11px;
+
+  --font-weight-*: initial;
+  --font-weight-normal: 400;
+  --font-weight-semibold: 600;
+
+  --leading-*: initial;
+  --leading-normal: 1.4;
+
+  /* One radius. rounded-full stays available for dots and meters. */
+  --radius-*: initial;
+  --radius-md: 6px;
+
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-shadow-*: initial;
+  --blur-*: initial;
+
+  /* Motion: 150 ms ease-out, opacity only. */
+  --ease-*: initial;
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  --animate-*: initial;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      transition-duration: 0s !important;
+      animation-duration: 0s !important;
+    }
+  }
+}
