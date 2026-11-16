@@ -61,6 +61,8 @@ Pass: ≥ 95% correct labels (44/46), ≤ 1 duplicate, pause and notes work, gue
 6. Installer: fresh Windows 11 VM without WebView2 → install → onboarding → 5-minute meeting → one Telegram draft. Then publish a new version; the app updates itself.
 
 ## 8. Screenshot inventory (`pnpm screenshot`, light and dark)
+Each state is written as `.screenshots/<state>.light.png` and `.screenshots/<state>.dark.png` (git-ignored). A state exists once it is listed in `src/screens/screens.ts`.
+
 home-empty · home-list · premeeting · live · live-ghost · live-unplanned · live-zoomed-out · paused · nomic-error · model-missing · cloud-confirm · end-screen · end-drafts · review · settings-audio · settings-speech · settings-ai · settings-scribe · settings-sending · settings-privacy · join-consent · join-name · join-live · join-ios-banner · join-disconnected.
 
 ## 9. Bug triage during dogfood

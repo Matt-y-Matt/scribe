@@ -16,7 +16,7 @@ End screen ──▶ Rust dispatch (Telegram, SMTP, .ics)
 | `audio/capture.rs` | Enumerate devices; capture mic + WASAPI loopback; resample to 16 kHz mono f32; ring buffers | vendored `audio-actual` (Anarlog) or Meetily's cpal/WASAPI path; `cpal`, `wasapi` (MIT) |
 | `audio/aec.rs` | Echo cancellation so speaker output is not transcribed twice | vendored `aec` (Anarlog, ONNX) or WebRTC AEC3 via Talky's approach |
 | `audio/vad.rs` | Silero VAD; utterance boundaries (700 ms silence, 30 s max) | sherpa-onnx VAD via `sherpa-rs` |
-| `audio/writer.rs` | Write 10 s WAV/FLAC chunks per source; crash-safe | `hound` (MIT) |
+| `audio/writer.rs` | Write 10 s WAV/FLAC chunks per source; crash-safe | `hound` (Apache-2.0) |
 | `stt/mod.rs` | `trait Transcriber { fn feed(&mut self, utt: Utterance) -> Segment }`; impls `LocalSherpa` (Parakeet, Whisper), `CloudSpeechmatics` | `sherpa-rs` (MIT bindings to sherpa-onnx, Apache-2.0); `tokio-tungstenite` for Speechmatics |
 | `stt/models.rs` | Model catalogue, download with resume + SHA-256, paths | `reqwest`, `sha2` |
 | `session/mod.rs` | Meeting state machine (idle → recording → paused → stopped); clock; assigns segment ids; fans out events | — |

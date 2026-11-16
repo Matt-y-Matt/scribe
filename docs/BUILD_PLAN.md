@@ -18,12 +18,12 @@ If M3 runs long, drop spoken replies and research to v1.1 before touching M4. Th
 ## M0 — Repo, tooling, fixtures (days 1–3)
 Tasks
 1. `pnpm create tauri-app` is not used; clone `dannysmith/tauri-template` (MIT), rename to `scribe`, update identifiers, keep its CLAUDE.md conventions merged into ours.
-2. Add deps: `@xyflow/react`, `dagre`, `@dnd-kit/core` + `@dnd-kit/sortable`, `wavesurfer.js`, `ai` (+ `@ai-sdk/anthropic`, `@ai-sdk/openai-compatible`), `zod`, `ulid`. Rust: `sherpa-rs`, `hound`, `sqlx` via `tauri-plugin-sql`, `tauri-plugin-store`, `tauri-plugin-global-shortcut`, `tauri-plugin-log`, `tauri-plugin-single-instance`, `tauri-plugin-window-state`, `tauri-specta`.
+2. Add deps: `@xyflow/react`, `@dagrejs/dagre`, `@dnd-kit/core` + `@dnd-kit/sortable`, `wavesurfer.js`, `ai` (+ `@ai-sdk/anthropic`, `@ai-sdk/openai-compatible`), `zod`, `ulid`. Rust: `sqlx` via `tauri-plugin-sql`, `tauri-plugin-store`, `tauri-plugin-global-shortcut`, `tauri-plugin-log`, `tauri-plugin-single-instance`, `tauri-plugin-window-state`, `tauri-specta`. (`sherpa-rs` and `hound` are added in M2, when they are first used.)
 3. Design tokens, fonts (self-hosted Inter and JetBrains Mono), light/dark switch, shadcn init with Base UI.
 4. Scripts: `pnpm check`, `pnpm test`, `pnpm replay`, `pnpm screenshot` (Playwright against `vite dev` with a `?screen=` query to render any screen state from fixtures).
 5. `docs/DECISIONS.md` seeded; `.github/workflows/ci.yml` on `windows-latest`.
 6. Replay harness: reads `fixtures/*.jsonl`, emits `segment:final` events into the engine at N× speed with simulated silences from the `t0/t1` gaps.
-Done: CI green; `pnpm replay fixtures/meeting-custore-weekly.jsonl --speed 10` streams 46 segments to the console; `pnpm screenshot` writes `home-empty.png`.
+Done: CI green; `pnpm replay fixtures/meeting-custore-weekly.jsonl --speed 10` streams 46 segments to the console; `pnpm screenshot` writes `home-empty.light.png` and `home-empty.dark.png`.
 
 ## M1 — Map engine on replay (weeks 1–2)
 Tasks
@@ -39,7 +39,7 @@ Done: gate above with a real provider (Ollama Qwen3.5 4B or Anthropic Haiku) and
 ## M2 — Live capture and transcript (weeks 3–5)
 Tasks
 1. Vendor Anarlog `audio-actual`, `aec`, `vad` by commit; wire mic + loopback → resample → AEC → VAD → utterances.
-2. `stt::LocalSherpa` with Parakeet-TDT 0.6B v3; model catalogue and downloader with resume and SHA-256; Whisper turbo as the second entry.
+2. Add `sherpa-rs` and `hound`. `stt::LocalSherpa` with Parakeet-TDT 0.6B v3; model catalogue and downloader with resume and SHA-256; Whisper turbo as the second entry.
 3. Session state machine; chunked WAV writer; SQLite persistence for segments, topics, cards (replace the in-memory adapter); FTS5.
 4. Status strip (indicator, elapsed, agenda chips, mode, privacy pill), transcript panel with "jump to live".
 5. Timeline: wavesurfer with Regions; seek, play span, highlights → quote cards; speaker bands (labels only, no diarization yet).

@@ -16,6 +16,7 @@ Define as CSS variables in `src/styles/tokens.css`, light and dark via `[data-th
 | --text-muted | #6B6B68 | #9A9A96 | meta, timestamps |
 | --accent | #2D5BFF | #6B8CFF | selection, primary buttons, decision cards |
 | --accent-soft | #E8EDFF | #1E2A4A | accent backgrounds |
+| --on-accent | #FFFFFF | #141416 | text on an accent fill (primary buttons) |
 | --record | #DC2626 | #EF4444 | recording indicator only |
 | --action | #B45309 | #F59E0B | action-item owner chip |
 | --research | #0F766E | #2DD4BF | research card badge |
@@ -83,7 +84,7 @@ wavesurfer.js: track in --surface-2, wave in --text-muted, progress in --accent.
 ## 3. Other screens
 
 ### 3.1 Home
-Left: "New meeting" (primary), meetings list (title, date, duration, participants, 3 chips of top topics), search box (title/participants/transcript). Right: the selected meeting's summary preview. Empty state: one sentence and the New meeting button. Error state (no model installed): banner with "Download model".
+Left: "New meeting" (primary), meetings list (title, date, duration, participants, 3 chips of top topics), search box (title/participants/transcript). Right: the selected meeting's summary preview. Empty state: "No meetings yet. Start one and Scribe keeps the notes." and the New meeting button. Error state (no model installed): banner with "Download model".
 
 ### 3.2 Pre-meeting (sheet over Home)
 Title; agenda editor (chips, add by typing or "🎤 say the agenda"); participants (expected names, optional); mode (group/solo); privacy pill; QR code (240 px) + short URL + "copy"; consent reminder line: "Tell the room you're recording. Phones ask for consent before joining."; `Start recording` (primary, accent) — becomes red on hover to signal it is live.
