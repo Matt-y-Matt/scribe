@@ -204,6 +204,44 @@ describe('golden scoring', () => {
     expect(score.wrongOwners).toEqual([])
   })
 
+  /** The mock, plus Matt's own action on s027: "…and I'll send it". */
+  const withMattSending = () =>
+    tampered(op =>
+      op.text === 'Draft the two options for UDO'
+        ? [
+            op,
+            {
+              ...op,
+              owner: 'Matt',
+              text: 'Send the drafted options to UDO',
+              segment_ids: ['s027'],
+            },
+          ]
+        : [op]
+    )
+
+  it('accepts a card the key lists as also accepted, without requiring it', async () => {
+    const score = await scoreOf(withMattSending())
+    expect(score.wrongOwners).toEqual([])
+    // Not one of the expected cards: the count is the same with or without it.
+    expect([score.cardsMatched, score.cardsExpected]).toEqual([17, 17])
+    expect(score.pass).toBe(true)
+  })
+
+  it('counts that card as a wrong owner when the key does not list it', async () => {
+    const { store } = await play(withMattSending())
+    acceptPinSuggestions(store)
+    const strict = scoreGolden(store, { ...expected, also_accepted: [] })
+    expect(strict.wrongOwners).toEqual([
+      {
+        owner: 'Matt',
+        text: 'Send the drafted options to UDO',
+        segments: ['s027'],
+      },
+    ])
+    expect(strict.pass).toBe(false)
+  })
+
   it('does not count a blank owner as a wrong one, only as unmatched', async () => {
     const score = await scoreOf(
       tampered(op =>

@@ -1,7 +1,7 @@
 {
   "fixture": "meeting-custore-weekly.jsonl",
   "agenda": ["CLA quote", "Supplier delays", "Designer hire"],
-  "notes": "Golden expectations for the replay test. Scoring rules are in docs/TEST_PLAN.md §Golden test. Topic titles may differ in wording; matching is by segment coverage, not exact title. Card text may differ; matching is by kind + owner + segment overlap.",
+  "notes": "Golden expectations for the replay test. Scoring rules are in docs/TEST_PLAN.md §Golden test. Topic titles may differ in wording; matching is by segment coverage, not exact title. Card text may differ; matching is by kind + owner + segment overlap. Cards under also_accepted are in the transcript but not required: they do not count towards card match, and their owner is not a wrong owner.",
   "topics": [
     { "key": "cla", "header": "CLA quote", "must_cover_segments": ["s004", "s005", "s006", "s007", "s008", "s009", "s010", "s012", "s013", "s014", "s016", "s036", "s037", "s038", "s039"] },
     { "key": "suppliers", "header": "Supplier delays", "must_cover_segments": ["s017", "s018", "s019", "s020", "s021", "s027"] },
@@ -27,6 +27,9 @@
     { "kind": "action", "topic": "designer", "owner": "Ant", "due_hint": "Friday", "segments": ["s034", "s035"], "gist": "write the job description" },
     { "kind": "action", "topic": "popup", "owner": "Zach", "segments": ["s042", "s043"], "gist": "set up a 30-minute call on the Christmas pop-up next week" },
     { "kind": "action", "topic": "aircon", "owner": "Matt", "due_hint": "today", "segments": ["s046"], "gist": "message the landlord about the aircon" }
+  ],
+  "also_accepted": [
+    { "kind": "action", "topic": "suppliers", "owner": "Matt", "segments": ["s027"], "gist": "send the drafted options to UDO (\"draft the two options for UDO and I'll send it\")" }
   ],
   "pins_at_end": ["aircon", "popup"],
   "never": [

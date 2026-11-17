@@ -15,6 +15,14 @@ import type { MapStore } from '../store'
 // Scoring for the golden replay test, docs/TEST_PLAN.md §2. The answers
 // behind these rules are in docs/DECISIONS.md (G1–G6).
 
+const cardSchema = z.object({
+  kind: z.enum(['note', 'decision', 'action', 'research', 'quote']),
+  topic: z.string(),
+  owner: z.string().optional(),
+  segments: z.array(z.string()).min(1),
+  gist: z.string(),
+})
+
 const expectedSchema = z.object({
   fixture: z.string(),
   topics: z.array(
@@ -28,15 +36,12 @@ const expectedSchema = z.object({
       must_cover_segments: z.array(z.string()),
     })
   ),
-  cards: z.array(
-    z.object({
-      kind: z.enum(['note', 'decision', 'action', 'research', 'quote']),
-      topic: z.string(),
-      owner: z.string().optional(),
-      segments: z.array(z.string()).min(1),
-      gist: z.string(),
-    })
-  ),
+  cards: z.array(cardSchema),
+  /**
+   * Cards the transcript supports but a correct map does not have to hold.
+   * They never count towards card match; their owner is not a wrong owner.
+   */
+  also_accepted: z.array(cardSchema).default([]),
   pins_at_end: z.array(z.string()),
 })
 export type GoldenExpected = z.infer<typeof expectedSchema>
@@ -221,7 +226,9 @@ export function scoreGolden(
   const matches = matchCards(expected.cards, cards)
   const cardsMatched = matches.filter(Boolean).length
 
-  const expectedActions = expected.cards.filter(card => card.kind === 'action')
+  const expectedActions = [...expected.cards, ...expected.also_accepted].filter(
+    card => card.kind === 'action'
+  )
   const wrongOwners = cards
     .filter(card => card.kind === 'action' && card.owner !== null)
     .filter(card => {
