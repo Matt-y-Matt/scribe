@@ -1,5 +1,6 @@
 import { countingSource } from './ids'
 import { headersOf, type Topic } from './model'
+import type { ReplayClock } from './replay/replay'
 import { MapStore, type PersistenceAdapter } from './store'
 
 // Shared set-up for engine tests: a small meeting with stable ids.
@@ -27,6 +28,17 @@ export function headerNamed(store: MapStore, title: string): Topic {
   const header = headersOf(store.getState()).find(row => row.title === title)
   if (!header) throw new Error(`no header "${title}"`)
   return header
+}
+
+/** A clock that never waits: a replay runs as fast as the engine allows. */
+export function instantClock(): ReplayClock {
+  let now = 0
+  return {
+    now: () => now,
+    sleep: async ms => {
+      now += ms
+    },
+  }
 }
 
 /** `s001`…`s<count>`, ten seconds apart. */
