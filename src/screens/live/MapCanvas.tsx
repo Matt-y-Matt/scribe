@@ -16,6 +16,7 @@ import {
   ReactFlowProvider,
   useOnViewportChange,
   useReactFlow,
+  type NodeChangeset,
   type NodeTypes,
   type OnNodeDrag,
   type Viewport,
@@ -142,6 +143,16 @@ function Flow({ canvas, dispatch, initialViewport, onZoom }: MapCanvasProps) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [store, flow, tidy, activeTopicId])
 
+  const onNodesChange = (changes: NodeChangeset<MapNode>) => {
+    const apply = () =>
+      dispatch({ type: 'changes', changes, map: store.getState() })
+    // A drag is applied at once. A measurement re-lays its column out, which
+    // resizes the column; inside the browser's resize callback that raises
+    // "ResizeObserver loop" errors, so it waits for the next frame.
+    if (changes.getByType('position').length > 0) apply()
+    else requestAnimationFrame(apply)
+  }
+
   const onNodeDragStop: OnNodeDrag<MapNode> = (_event, node) => {
     if (node.type !== 'topic') return
     const from = layout.columns.find(column => column.id === node.parentId)
@@ -196,9 +207,7 @@ function Flow({ canvas, dispatch, initialViewport, onZoom }: MapCanvasProps) {
           nodes={nodes}
           edges={[]}
           nodeTypes={NODE_TYPES}
-          onNodesChange={changes =>
-            dispatch({ type: 'changes', changes, map: store.getState() })
-          }
+          onNodesChange={onNodesChange}
           onNodeDragStop={onNodeDragStop}
           defaultViewport={initialViewport}
           minZoom={MIN_ZOOM}

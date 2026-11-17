@@ -45,6 +45,19 @@ jobs:
 
       - run: pnpm test
 
+      # UI behaviour (docs/TEST_PLAN.md §1): Playwright against `vite dev`.
+      - run: pnpm exec playwright install chromium
+
+      - run: pnpm e2e
+
+      - name: Keep the Playwright report when a UI test fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
       # The manifest is embedded by the linker (src-tauri/build.rs). A binary
       # without it exits at load, so prove the real app executable stays up.
       - name: Smoke test, the app starts

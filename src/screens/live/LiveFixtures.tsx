@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FIXTURE_PINS, fixtureStore, type FixtureOptions } from './fixture'
 import { LiveScreen } from './LiveScreen'
+import { installTestHook } from './test-hook'
 
 // The live screen's `?screen=` states (docs/TEST_PLAN.md §8), each the golden
 // meeting replayed to the point that state shows.
@@ -8,6 +9,7 @@ import { LiveScreen } from './LiveScreen'
 function fixtureScreen(options: FixtureOptions, zoom?: number) {
   return function LiveFixture() {
     const [store] = useState(() => fixtureStore(options))
+    useEffect(() => installTestHook(store), [store])
     return <LiveScreen store={store} zoom={zoom} />
   }
 }
