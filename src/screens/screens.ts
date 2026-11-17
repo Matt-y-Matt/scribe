@@ -2,7 +2,13 @@
 // `?screen=<id>` under `vite dev`. `pnpm screenshot` walks this list; the full
 // inventory it grows into is docs/TEST_PLAN.md §8. Plain data, no React, so
 // Node scripts can import it.
-export const SCREEN_IDS = ['home-empty'] as const
+export const SCREEN_IDS = [
+  'home-empty',
+  'live',
+  'live-ghost',
+  'live-unplanned',
+  'live-zoomed-out',
+] as const
 
 export type ScreenId = (typeof SCREEN_IDS)[number]
 
