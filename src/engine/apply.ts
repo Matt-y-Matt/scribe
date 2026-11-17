@@ -154,7 +154,14 @@ export function applyOps(
     )
   const topicFor = (ref: string | undefined): Topic | undefined => {
     if (!ref) return undefined
-    return state().topics[tmpKeys.get(ref) ?? ref]
+    const byId = state().topics[tmpKeys.get(ref) ?? ref]
+    if (byId) return byId
+    // A small model sometimes writes the title where an id belongs. Take it
+    // when exactly one topic or header has that title.
+    const named = Object.values(state().topics).filter(topic =>
+      sameTitle(topic.title, ref)
+    )
+    return named.length === 1 ? named[0] : undefined
   }
 
   function addTopicRow(

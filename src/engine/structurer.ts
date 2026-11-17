@@ -1,4 +1,5 @@
 import type { SegmentFinal } from '../ipc'
+import { aliasInput } from './aliases'
 import { applyOps, type DroppedOp } from './apply'
 import { cardsIn, headersOf, type MapState } from './model'
 import type { StructurerInput, StructurerProvider } from './providers/types'
@@ -14,6 +15,8 @@ import { afterRun, countWords, initialTrigger, onSegment } from './trigger'
 /** How much already-structured transcript the model sees again. */
 export const RECENT_MS = 90_000
 const LAST_CARDS = 2
+/** A run is tried twice before its segments are left for the next one. */
+const ATTEMPTS = 2
 
 export type RunReason = 'silence' | 'elapsed' | 'end'
 
@@ -55,6 +58,7 @@ export function buildInput(
         id: topic.id,
         title: topic.title,
         parent_id: topic.parent_id,
+        header: state.topics[topic.parent_id ?? '']?.title ?? null,
         off_agenda: topic.off_agenda,
         last_cards: cardsIn(state, topic.id)
           .slice(-LAST_CARDS)
@@ -163,7 +167,8 @@ export class Structurer implements SegmentSink {
     }
     this.waited = false
 
-    const batch = this.due
+    // In meeting order: a failed run's segments rejoin ahead of later ones.
+    const batch = [...this.due].sort((a, b) => a.t0_ms - b.t0_ms)
     const record: RunRecord = {
       index: this.runs.length,
       reason: this.dueReason ?? 'elapsed',
@@ -193,11 +198,23 @@ export class Structurer implements SegmentSink {
     )
     const input = buildInput(this.store.getState(), recent, batch, nowMs)
 
+    // The model sees short aliases (H1, T3) in place of the map's ids.
+    const aliased = aliasInput(input)
+
     let reply: unknown
-    try {
-      reply = await this.provider.structure(input)
-    } catch (error) {
-      record.error = error instanceof Error ? error.message : String(error)
+    let failure: unknown
+    for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+      try {
+        reply = aliased.restore(await this.provider.structure(aliased.input))
+        failure = undefined
+        break
+      } catch (error) {
+        failure = error ?? new Error('provider failed')
+      }
+    }
+    if (failure !== undefined) {
+      record.error =
+        failure instanceof Error ? failure.message : String(failure)
       this.options.log?.('structurer run failed', {
         run: record.index,
         provider: this.provider.name,

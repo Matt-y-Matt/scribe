@@ -50,14 +50,15 @@ Built on the reference PC, in the order of the approved plan below, one commit p
 - `pnpm check && pnpm test`: green on the PC. 171 TypeScript tests, 3 Rust tests.
 - `pnpm e2e`: 13 Playwright tests green (Chromium, 1280 × 800).
 - **Golden replay, MockProvider** (`pnpm golden --provider mock`, and `src/engine/golden/golden.test.ts` in CI): **PASS**. Topic coverage 5/5 (CLA 14/15, suppliers 6/6, designer 6/6, aircon 3/3, pop-up 1/1). Card match 17/17 (100%). Wrong owners 0. Both pins suggested and pinned at the end. Never rules: 0 violated. 8 runs, none skipped, none overlapping. The mock's ops are written by hand against the transcript, so this score checks the engine and the scoring, not a model.
-- **Golden replay, real provider: not run yet.** Ollama does not answer at `http://127.0.0.1:11434` on the PC (it is not installed), so the real provider is Anthropic Haiku (`claude-haiku-5-5`), and no key has been set. Run `pnpm golden --provider anthropic --map` with `ANTHROPIC_API_KEY` set, record the score here, and tune `src/engine/prompts/structurer.md` if it fails. **The M1 gate is not met until this line has a passing score.**
+- **Golden replay, Ollama `qwen3.5:4b`** (`pnpm golden --provider ollama`, local, Ollama 0.40.16 on the RTX 3070, reasoning off): **PASS at 10×, four runs out of four.** Topic coverage 5/5 (CLA 12–13/15, suppliers 6/6, designer 6/6, aircon 3/3, pop-up 1/1). Card match 15/17 (88%). Wrong owners 0. Both pins suggested and pinned at the end. Never rules: 0 violated. No op dropped, no run failed; a run takes 2 to 6 s. The two cards it misses are the 3.50-a-name decision (it writes a note) and Matt's "message the landlord" action (it cites `s045`, not `s046`).
+- **The same model, paced** (`--paced`: each run gets exactly one trigger's batch, as in a live meeting): 5/5, 15/17, both pins, never rules 0, but **1 wrong owner, so a fail.** The card is "Matt: send the drafted options to UDO" on `s027`, where Matt says "draft the two options for UDO and I'll send it". The answer key has only Zach's action there. The model is reading the transcript correctly; whether the key should allow Matt on `s027`, as it allows two owners on `s010`, is Matt's call. At 10× the batches fall differently and the model does not write that card.
+- **Anthropic Haiku: not run.** No key was set, by choice: the local model is the default and meets the gate. `pnpm golden --provider anthropic` is ready for the day it is wanted.
 - Viewport: the transform is unchanged after 20 card inserts (Playwright), and after a card drag.
 - `pnpm screenshot`: `live`, `live-ghost`, `live-unplanned`, `live-zoomed-out` in light and dark, reviewed against UI_SPEC §2 and §5.
 
 ### Not verified
-- Nothing from M1 has been pushed: the PC has no GitHub credentials for this shell, so the nine M1 commits are local and the Windows CI run with the new Playwright step has not happened.
-- The Ollama provider has never talked to an Ollama server. Its request is unit-tested against a mock model only.
-- The Anthropic provider has not made a real call (see above).
+- The Anthropic provider has not made a real call (see above). Neither has Ollama's `ops` protocol on a model large enough to follow it.
+- The golden pass on the local model rests on one fixture, and its prompt's three examples come from that fixture (BUILD_PLAN asks for that). It says the engine and the model can do this meeting, not any meeting.
 - The live screen has been opened in Chromium (Playwright) only, not inside the Tauri window. `pnpm tauri dev` still opens on Home, and nothing in the app navigates to the live screen yet.
 - `structurer.worker.ts` has never run as a real Web Worker. Both ends of its protocol are tested through an in-memory port.
 
@@ -72,8 +73,16 @@ Built on the reference PC, in the order of the approved plan below, one commit p
 - A few "ResizeObserver loop completed with undelivered notifications" errors still reach the dev console when a column re-lays itself out. They are harmless; the Playwright tests ignore that one message.
 - The right-hand column below the Pins rail is empty until the scribe panel (M3).
 
+### What it took to get a 4B local model through (2026-11-17)
+- First run: every call failed with no output. Ollama loads a model with a 4,096-token context unless told otherwise, and its OpenAI-compatible endpoint cannot be told. The provider now uses Ollama's native `/api/chat` with `num_ctx` 16,384.
+- With the full op protocol the model scored 24% to 71%. Its content was right; it lost cards by leaving out the topic, inventing topic ids, and mixing up header ids that differ in one character. Three changes fixed that: the model sees short aliases (`H1`, `T3`) instead of ULIDs; a topic may be named by title; and a local model gets the card protocol (`src/engine/providers/cards.ts`, prompt `structurer-cards.md`), in which it goes through the new segments one by one, says whether each is new, a recap, the agenda or neither, picks the header from a fixed list and names the topic. The engine builds the ops from that. That took it from 71% to 88%.
+- Reasoning on (`--think`) is not usable live on this PC: runs took 11 to 178 s and one ran out of context.
+- A failed run used to put its segments back out of order, and a failure on the last run of a meeting was never retried. A run is now tried twice, and a batch is always in meeting order.
+- `@ai-sdk/openai-compatible` is no longer used by any code. It stays for the OpenAI-compatible provider PRD F12.2 lists.
+
 ### For the next session
-- `pnpm golden --provider ollama` checks that Ollama answers and has `qwen3.5:4b`; if it does not, it says to run `ollama pull qwen3.5:4b`.
+- Ollama is installed on the PC (winget, per-user) with `qwen3.5:4b` pulled (3.3 GB). `pnpm golden --provider ollama` checks both and says what is missing.
+- `pnpm golden --trace <file>` writes each run's input and raw reply as JSON lines; that is how the protocol problems above were found.
 - The structurer prompt has three examples taken from the golden fixture itself (BUILD_PLAN asks for that). A second fixture would show whether the prompt generalises.
 
 ## M1 — approved plan (2026-11-17)

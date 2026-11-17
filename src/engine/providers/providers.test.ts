@@ -1,12 +1,18 @@
 // @vitest-environment node
 import { MockLanguageModelV4 } from 'ai/test'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { createAiSdkProvider, looseJson, modelOutputSchema } from './ai-sdk'
 import { ANTHROPIC_MODEL } from './anthropic'
+import { cardsMessage, cardsSchema } from './cards'
 import { createProvider } from './index'
 import { createMockProvider, parseMockOps } from './mock'
-import { isLoopback, OLLAMA_MODEL, ollamaModels } from './ollama'
+import {
+  isLoopback,
+  OLLAMA_CONTEXT_TOKENS,
+  OLLAMA_MODEL,
+  ollamaModels,
+} from './ollama'
 import type { StructurerInput } from './types'
 
 const INPUT: StructurerInput = {
@@ -101,6 +107,127 @@ describe('looseJson', () => {
     expect(looseJson('```json\n{"ops":[]}\n```')).toEqual({ ops: [] })
     expect(looseJson('Sure! {"ops":[]} Hope that helps.')).toEqual({ ops: [] })
     expect(looseJson('no json here')).toBeUndefined()
+  })
+})
+
+describe('Ollama provider', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  /** Stands in for Ollama's /api/chat and keeps what it was sent. */
+  function ollamaReplying(status: number, body: unknown) {
+    const requests: { url: string; body: Record<string, unknown> }[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init: RequestInit) => {
+        requests.push({ url, body: JSON.parse(String(init.body)) })
+        return new Response(
+          typeof body === 'string' ? body : JSON.stringify(body),
+          { status }
+        )
+      })
+    )
+    return requests
+  }
+  const ollama = () =>
+    createProvider({ kind: 'ollama', prompt: 'You keep the map.' })
+
+  it('asks the native API for the card protocol, with room to work', async () => {
+    const requests = ollamaReplying(200, {
+      message: {
+        content: JSON.stringify({
+          segments: [
+            {
+              id: 's001',
+              type: 'new',
+              header: 't_A',
+              topic: 'Pricing',
+              cards: [
+                { kind: 'note', owner: null, due_text: null, text: 'Hello' },
+              ],
+            },
+          ],
+        }),
+      },
+      done_reason: 'stop',
+    })
+    // The model's cards come back as the ops the engine's rules judge.
+    await expect(ollama().structure(INPUT)).resolves.toEqual({
+      ops: [
+        {
+          op: 'add_topic',
+          tmp_key: 'n1',
+          title: 'Pricing',
+          parent_id: 't_A',
+          off_agenda: false,
+          segment_ids: ['s001'],
+        },
+        {
+          op: 'add_card',
+          topic_id: 'n1',
+          kind: 'note',
+          text: 'Hello',
+          owner: null,
+          due_text: null,
+          segment_ids: ['s001'],
+        },
+      ],
+    })
+
+    const [request] = requests
+    expect(request?.url).toBe('http://127.0.0.1:11434/api/chat')
+    expect(request?.body).toMatchObject({
+      model: OLLAMA_MODEL,
+      stream: false,
+      // Reasoning off, and a context the prompt and transcript fit in:
+      // Ollama's default of 4,096 tokens silently truncates them.
+      think: false,
+      options: { num_ctx: OLLAMA_CONTEXT_TOKENS, temperature: 0 },
+      messages: [
+        { role: 'system', content: 'You keep the map.' },
+        { role: 'user', content: cardsMessage(INPUT) },
+      ],
+    })
+    // The schema is this request's own: only its segments and headers.
+    expect(request?.body.format).toEqual(cardsSchema(INPUT))
+  })
+
+  it('can ask for the full op list instead', async () => {
+    const ops = [{ op: 'suggest_pin', tmp_key_or_topic_id: 't_1', title: 'x' }]
+    const requests = ollamaReplying(200, {
+      message: { content: JSON.stringify({ ops }) },
+    })
+    const provider = createProvider({
+      kind: 'ollama',
+      prompt: 'p',
+      protocol: 'ops',
+      think: true,
+      model: 'bigger:30b',
+    })
+    await expect(provider.structure(INPUT)).resolves.toEqual({ ops })
+    expect(provider.name).toBe('ollama:bigger:30b')
+    expect(requests[0]?.body).toMatchObject({
+      model: 'bigger:30b',
+      think: true,
+      messages: [
+        { role: 'system', content: 'p' },
+        { role: 'user', content: JSON.stringify(INPUT) },
+      ],
+    })
+    expect(JSON.stringify(requests[0]?.body.format)).toContain('add_card')
+  })
+
+  it('fails the run on an error status, with the message Ollama gave', async () => {
+    ollamaReplying(404, '{"error":"model \\"qwen3.5:4b\\" not found"}')
+    await expect(ollama().structure(INPUT)).rejects.toThrow(
+      /Ollama answered 404: .*not found/
+    )
+  })
+
+  it('fails the run when the reply holds no JSON', async () => {
+    ollamaReplying(200, { message: { content: '' }, done_reason: 'length' })
+    await expect(ollama().structure(INPUT)).rejects.toThrow(
+      'Ollama returned no JSON (done_reason: length)'
+    )
   })
 })
 
@@ -208,6 +335,7 @@ describe('MockProvider', () => {
         id: 't_P',
         title: 'Pricing',
         parent_id: 't_A',
+        header: 'CLA quote',
         off_agenda: false,
         last_cards: [],
       },

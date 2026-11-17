@@ -10,6 +10,8 @@ export interface StructurerInput {
     id: string
     title: string
     parent_id: string | null
+    /** The title of the header it sits under, for a model that needs it. */
+    header: string | null
     off_agenda: boolean
     last_cards: { id: string; kind: string; text: string }[]
   }[]

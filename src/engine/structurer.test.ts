@@ -195,24 +195,45 @@ describe('Structurer', () => {
     }
 
     feed(1, 5)
-    calls[0]?.reject(new Error('connection refused'))
-    await structurer.idle()
+    // The run is tried twice with the same input before it gives up.
+    calls[0]?.reject(new Error('timed out'))
+    await vi.waitFor(() => expect(calls).toHaveLength(2))
+    expect(ids(calls[1])).toEqual(ids(calls[0]))
+    // More of the meeting arrives, and another trigger, while it is out.
+    feed(6, 10)
+    calls[1]?.reject(new Error('connection refused'))
+
+    await vi.waitFor(() => expect(calls).toHaveLength(3))
     expect(structurer.runs[0]).toMatchObject({
       error: 'connection refused',
       applied: 0,
     })
-    expect(calls).toHaveLength(1)
     expect(log).toHaveBeenCalledWith('structurer run failed', {
       run: 0,
       provider: 'manual',
       error: 'connection refused',
     })
 
-    structurer.end()
-    expect(ids(calls[1])).toEqual(['s001', 's002', 's003', 's004', 's005'])
-    calls[1]?.resolve([])
+    // The next run leads with the segments that failed, in meeting order.
+    expect(ids(calls[2])).toEqual(
+      Array.from({ length: 10 }, (_, i) => `s${String(i + 1).padStart(3, '0')}`)
+    )
+    calls[2]?.resolve([])
     await structurer.idle()
     expect(structurer.runs[1]?.error).toBeUndefined()
+    expect(structurer.runs).toHaveLength(2)
+  })
+
+  it('recovers when the first attempt fails and the second works', async () => {
+    const { store, structurer, feed, calls } = setUp()
+    feed(1, 5)
+    calls[0]?.reject(new Error('busy'))
+    await vi.waitFor(() => expect(calls).toHaveLength(2))
+    calls[1]?.resolve([])
+    await structurer.idle()
+    expect(structurer.runs).toMatchObject([{ applied: 0 }])
+    expect(structurer.runs[0]?.error).toBeUndefined()
+    expect(store.now).toBe(49_500)
   })
 
   it('moves the meeting clock as segments arrive', () => {
@@ -253,11 +274,14 @@ describe('buildInput', () => {
       'Supplier delays',
       'Designer hire',
     ])
-    expect(input?.agenda[0]?.id).toBe(cla.id)
+    // The provider is shown aliases, not the map's ids (aliases.ts).
+    expect(input?.agenda[0]?.id).toBe('H1')
     expect(input?.outline).toMatchObject([
       {
         title: 'Pricing',
-        parent_id: cla.id,
+        id: 'T1',
+        parent_id: 'H1',
+        header: 'CLA quote',
         off_agenda: false,
         // The last two cards only.
         last_cards: [

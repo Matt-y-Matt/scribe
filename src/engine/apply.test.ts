@@ -218,10 +218,49 @@ describe('applyOps', () => {
   })
 
   it('does not carry a tmp_key over to the next batch', () => {
-    const { store } = setUp()
+    const store = testStore()
+    const cla = headerNamed(store, 'CLA quote')
+    const addTopic = {
+      op: 'add_topic',
+      tmp_key: 'k1',
+      title: 'Pricing',
+      parent_id: cla.id,
+    }
+    applyOps(store, [addTopic], context())
     const { dropped } = applyOps(
       store,
-      [note(['s006'], { tmp_topic: 'pricing' })],
+      [note(['s006'], { tmp_topic: 'k1' })],
+      context()
+    )
+    expect(dropped.map(drop => drop.reason)).toEqual(['unknown_topic'])
+  })
+
+  it('takes a title where an id belongs, when only one topic has it', () => {
+    const { store, cla, pricing } = setUp()
+    applyOps(
+      store,
+      [
+        note(['s006'], { topic_id: 'pricing' }),
+        note(['s007'], { topic_id: 'CLA quote' }),
+        note(['s008'], { topic_id: 'cla QUOTE ' }),
+      ],
+      context()
+    )
+    const topics = topicsUnder(store.getState(), cla.id)
+    expect(topics.map(topic => topic.title)).toEqual(['Pricing', GENERAL_TITLE])
+    expect(cardsIn(store.getState(), pricing.id)).toHaveLength(1)
+    expect(cardsIn(store.getState(), topics[1]?.id ?? '')).toHaveLength(2)
+
+    // Two topics called "General" now exist nowhere else, but a title two
+    // topics share names neither.
+    applyOps(
+      store,
+      [note(['s009'], { topic_id: headerNamed(store, 'Supplier delays').id })],
+      context()
+    )
+    const { dropped } = applyOps(
+      store,
+      [note(['s010'], { topic_id: GENERAL_TITLE })],
       context()
     )
     expect(dropped.map(drop => drop.reason)).toEqual(['unknown_topic'])

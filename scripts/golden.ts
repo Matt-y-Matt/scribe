@@ -1,11 +1,11 @@
-// `pnpm golden --provider mock|ollama|anthropic [--speed 10] [--model <id>] [--map]`
+// `pnpm golden --provider mock|ollama|anthropic [--paced] [--map] [--trace <file>]`
 // Replays the golden fixture through the engine with the chosen provider and
 // prints the score (docs/TEST_PLAN.md §2). The mock is what CI runs; a real
 // provider is run by hand and its score recorded in docs/NOTES.md.
 //
 // Only the fixture transcript is ever sent to a provider from here. Anthropic
 // reads the key from ANTHROPIC_API_KEY.
-import { readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import {
   acceptPinSuggestions,
@@ -16,6 +16,7 @@ import {
 import { cardsIn, headersOf, topicsUnder } from '../src/engine/model'
 import { createProvider, type ProviderConfig } from '../src/engine/providers'
 import { parseMockOps } from '../src/engine/providers/mock'
+import type { StructurerProvider } from '../src/engine/providers/types'
 import {
   OLLAMA_MODEL,
   ollamaModels,
@@ -29,8 +30,9 @@ import {
 
 const FIXTURE = 'fixtures/meeting-custore-weekly'
 const PROMPT = 'src/engine/prompts/structurer.md'
+const CARDS_PROMPT = 'src/engine/prompts/structurer-cards.md'
 const USAGE =
-  'Usage: pnpm golden --provider mock|ollama|anthropic [--speed <n>] [--model <id>] [--map]'
+  'Usage: pnpm golden --provider mock|ollama|anthropic [--speed <n>] [--paced] [--model <id>] [--think] [--map] [--trace <file>]'
 
 function fail(message: string): never {
   console.error(message)
@@ -45,6 +47,16 @@ const { values } = parseArgs({
     model: { type: 'string' },
     /** Print the map the provider built, for reading a failed score. */
     map: { type: 'boolean', default: false },
+    /**
+     * Wait for each run to finish before playing on, so every run gets the
+     * batch its trigger asked for. That is what a live meeting gives a model
+     * that answers inside 45 s; at 10× a slow model gets several at once.
+     */
+    paced: { type: 'boolean', default: false },
+    /** Ollama only: let a thinking model reason before it answers. */
+    think: { type: 'boolean', default: false },
+    /** Write every run's input and raw reply to this file, as JSON lines. */
+    trace: { type: 'string' },
   },
 })
 
@@ -69,7 +81,13 @@ async function providerConfig(): Promise<ProviderConfig> {
       if (!models.includes(model)) {
         fail(`Ollama has no model "${model}". Run: ollama pull ${model}`)
       }
-      return { kind: 'ollama', prompt: read(PROMPT), model }
+      return {
+        kind: 'ollama',
+        // A local model gets the cut-down card protocol and its own prompt.
+        prompt: read(CARDS_PROMPT),
+        model,
+        think: values.think,
+      }
     }
     case 'anthropic': {
       const apiKey = process.env.ANTHROPIC_API_KEY
@@ -89,30 +107,53 @@ async function providerConfig(): Promise<ProviderConfig> {
 const segments = parseFixtureJsonl(read(`${FIXTURE}.jsonl`))
 const meta = parseFixtureMeta(read(`${FIXTURE}.meta.json`))
 const expected = parseExpected(read(`${FIXTURE}.expected.json`))
-const provider = createProvider(await providerConfig())
+const real = createProvider(await providerConfig())
+const tracePath = values.trace
+if (tracePath) writeFileSync(tracePath, '')
+/** The provider, with each exchange copied to the trace file if one is set. */
+const provider: StructurerProvider = {
+  name: real.name,
+  local: real.local,
+  async structure(input, signal) {
+    const started = performance.now()
+    let reply: unknown
+    try {
+      reply = await real.structure(input, signal)
+      return reply
+    } catch (error) {
+      reply = { error: error instanceof Error ? error.message : String(error) }
+      throw error
+    } finally {
+      if (tracePath) {
+        const seconds = Math.round((performance.now() - started) / 100) / 10
+        appendFileSync(
+          tracePath,
+          `${JSON.stringify({ seconds, input, reply })}\n`
+        )
+      }
+    }
+  },
+}
 
 console.log(
   `Golden replay: ${meta.title}, ${segments.length} segments at ${speed}×, ` +
-    `provider ${provider.name}${provider.local ? '' : ' (cloud: the fixture transcript leaves this PC)'}\n`
+    `provider ${provider.name}${values.paced ? ', paced' : ''}${provider.local ? '' : ' (cloud: the fixture transcript leaves this PC)'}\n`
 )
 
-const { store, structurer, summary } = await replayIntoEngine(
-  segments,
-  meta,
-  provider,
-  {
-    speed,
-    onRun(run) {
-      const range = `${run.segmentIds[0]}–${run.segmentIds.at(-1)}`
-      const outcome = run.error
-        ? `FAILED: ${run.error}`
-        : `${run.applied} applied, ${run.dropped.length} dropped`
-      console.log(
-        `  run ${run.index + 1}  ${run.reason.padEnd(7)}  ${range}  ${outcome}`
-      )
-    },
-  }
-)
+const startedAt = performance.now()
+const { store, structurer } = await replayIntoEngine(segments, meta, provider, {
+  speed,
+  paced: values.paced,
+  onRun(run) {
+    const range = `${run.segmentIds[0]}–${run.segmentIds.at(-1)}`
+    const outcome = run.error
+      ? `FAILED: ${run.error}`
+      : `${run.applied} applied, ${run.dropped.length} dropped`
+    console.log(
+      `  run ${run.index + 1}  ${run.reason.padEnd(7)}  ${range}  ${outcome}`
+    )
+  },
+})
 
 const dropped = structurer.dropped
 if (dropped.length > 0) {
@@ -152,6 +193,6 @@ const score = scoreGolden(store, expected)
 console.log(
   `\n${formatScore(score, provider.name)}\n` +
     `  runs            ${structurer.runs.length} (${failedRuns.length} failed), ` +
-    `${(summary.wallMs / 1000).toFixed(1)} s`
+    `${((performance.now() - startedAt) / 1000).toFixed(1)} s`
 )
 process.exit(score.pass && failedRuns.length === 0 ? 0 : 1)

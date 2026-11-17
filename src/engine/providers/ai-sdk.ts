@@ -7,32 +7,50 @@ import type { StructurerInput, StructurerProvider } from './types'
 // input as JSON; the reply is constrained to `modelOutputSchema` where the
 // model supports it (Ollama `format`, Anthropic structured outputs).
 
-const ids = z.array(z.string())
+const ids = z
+  .array(z.string())
+  .describe('Ids of the segments in new_segments this rests on, e.g. "s010".')
 
 /**
  * The op list as a model is asked to write it: plain JSON Schema, no
- * transforms. It is looser than the rules in apply.ts, which have the last
- * word on every op.
+ * transforms. It is the engine's schema (apply.ts) made stricter where a
+ * small model needs the push: a card must say which topic it goes under
+ * (one `topic_id` field, which also takes a tmp_key), and must say who owns
+ * it or that nobody does. The rules in apply.ts still have the last word.
  */
 export const modelOutputSchema = z.object({
   ops: z.array(
     z.discriminatedUnion('op', [
       z.object({
         op: z.literal('add_topic'),
-        tmp_key: z.string(),
-        title: z.string(),
-        parent_id: z.string().optional(),
+        tmp_key: z.string().describe('A short key you choose, e.g. "k1".'),
+        title: z.string().describe('Two or three words.'),
+        parent_id: z
+          .string()
+          .nullable()
+          .describe('The id of the agenda header; null when off_agenda.'),
         off_agenda: z.boolean(),
         segment_ids: ids,
       }),
       z.object({
         op: z.literal('add_card'),
-        topic_id: z.string().optional(),
-        tmp_topic: z.string().optional(),
+        topic_id: z
+          .string()
+          .describe(
+            'Where the card goes: the id of a topic in outline, or the tmp_key of a topic added earlier in this reply.'
+          ),
         kind: z.enum(['note', 'decision', 'action']),
         text: z.string(),
-        owner: z.string().optional(),
-        due_text: z.string().optional(),
+        owner: z
+          .string()
+          .nullable()
+          .describe(
+            'For an action: the participant who will do it. Otherwise null.'
+          ),
+        due_text: z
+          .string()
+          .nullable()
+          .describe('For an action with a deadline, e.g. "Friday". Else null.'),
         segment_ids: ids,
       }),
       z.object({

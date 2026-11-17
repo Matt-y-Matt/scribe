@@ -12,7 +12,7 @@ Scribe is a Windows desktop meeting secretary: it records the room, transcribes 
 ## Stack
 - Tauri v2 (Rust core) + React 19 + TypeScript + Vite + Tailwind v4 + shadcn/ui (Base UI)
 - Map: @xyflow/react + @dagrejs/dagre. Reorder: dnd-kit (pointer-based). Timeline: wavesurfer.js + Regions
-- LLM calls: Vercel AI SDK (`ai`), provider switchable (Ollama local / Anthropic / OpenAI-compatible)
+- LLM calls: provider switchable. Ollama (local, the default) through its native API; Anthropic and OpenAI-compatible through the Vercel AI SDK (`ai`). See DECISIONS 2026-11-17
 - Speech: sherpa-onnx via `sherpa-rs` (Parakeet-TDT 0.6B v3 default; Whisper turbo multilingual option); cloud switch = Speechmatics
 - Audio capture: vendored WASAPI crates (see ARCHITECTURE §Vendored) — do not rewrite capture
 - Store: SQLite via `tauri-plugin-sql` (sqlx) + FTS5; settings via `tauri-plugin-store`
@@ -24,7 +24,7 @@ Scribe is a Windows desktop meeting secretary: it records the room, transcribes 
 - `pnpm test` = `vitest run` · `cargo test`
 - `pnpm format` — prettier and `cargo fmt` · `pnpm ipc` — regenerate `src/ipc.ts` from `src-tauri/src/ipc.rs`
 - `pnpm replay fixtures/meeting-custore-weekly.jsonl --speed 10` — plays a transcript into the engine without audio
-- `pnpm golden --provider mock|ollama|anthropic` — replays the fixture through the engine and prints the golden score (TEST_PLAN §2); Anthropic reads `ANTHROPIC_API_KEY`
+- `pnpm golden --provider mock|ollama|anthropic` — replays the fixture through the engine and prints the golden score (TEST_PLAN §2); `--paced` gives each run one trigger's batch, `--map` prints the map, `--trace <file>` keeps the raw replies; Anthropic reads `ANTHROPIC_API_KEY`
 - `pnpm screenshot` — Playwright screenshots of every screen state into `.screenshots/<state>.<light|dark>.png` (git-ignored)
 
 ## Layout

@@ -17,6 +17,13 @@ import {
 
 export interface EngineReplayOptions extends ReplayOptions {
   ids?: IdSource
+  /**
+   * Play as fast as the structurer allows, waiting for each run to finish
+   * before the next segment. Every run then gets exactly the batch its
+   * trigger asked for, as in a live meeting with a model that keeps up.
+   * `speed` and `clock` are ignored.
+   */
+  paced?: boolean
   /** A second sink that hears the same segments, e.g. the console. */
   also?: SegmentSink
   onRun?: (run: RunRecord) => void
@@ -54,7 +61,7 @@ export async function replayIntoEngine(
   provider: StructurerProvider,
   options: EngineReplayOptions = {}
 ): Promise<EngineReplay> {
-  const { ids, also, onRun, log, ...replayOptions } = options
+  const { ids, also, onRun, log, paced, ...replayOptions } = options
   const store = storeForFixture(meta, replayOptions.meetingId, ids)
   const structurer = new Structurer({ store, provider, onRun, log })
 
@@ -70,7 +77,14 @@ export async function replayIntoEngine(
         also?.end?.(done)
       },
     },
-    replayOptions
+    paced
+      ? {
+          ...replayOptions,
+          // Never ahead of schedule, so the replay asks to wait before every
+          // segment, and waiting means letting the structurer finish.
+          clock: { now: () => 0, sleep: () => structurer.idle() },
+        }
+      : replayOptions
   )
   await structurer.idle()
   return { store, structurer, summary }
