@@ -8,6 +8,7 @@ import {
   type LiveContextValue,
 } from './live-context'
 import { COLLAPSE_ZOOM, MapCanvas } from './MapCanvas'
+import { PinsRail } from './PinsRail'
 
 // The live meeting screen, UI_SPEC §2. M1 builds the map and the Pins rail;
 // the status strip, the scribe panel and the timeline arrive with the
@@ -59,7 +60,7 @@ export function LiveScreen({ store, zoom = 0.8 }: LiveScreenProps) {
           <MapCanvas
             canvas={canvas}
             dispatch={dispatch}
-            initialViewport={{ x: 16, y: 16, zoom }}
+            initialViewport={{ x: 16, y: 20, zoom }}
             onZoom={next => setCollapsed(next < COLLAPSE_ZOOM)}
           />
           {toast && (
@@ -85,7 +86,9 @@ export function LiveScreen({ store, zoom = 0.8 }: LiveScreenProps) {
         <aside
           aria-label="Pins"
           className="flex w-[320px] shrink-0 flex-col border-l bg-surface"
-        />
+        >
+          <PinsRail />
+        </aside>
       </main>
     </LiveContext>
   )

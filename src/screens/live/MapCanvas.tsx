@@ -23,7 +23,7 @@ import {
 import { ArrowDown } from 'lucide-react'
 import { useEffect, useRef, useState, type ActionDispatch } from 'react'
 import { Button } from '@/components/ui/button'
-import { moveCard, moveTopic } from '@/engine/actions'
+import { moveCard, moveTopic, pinTopic } from '@/engine/actions'
 import type { Card } from '@/engine/model'
 import type { CanvasAction, CanvasState } from './canvas-state'
 import { CardFace, type DropTarget } from './CardRow'
@@ -66,7 +66,7 @@ export interface MapCanvasProps {
 }
 
 function Flow({ canvas, dispatch, initialViewport, onZoom }: MapCanvasProps) {
-  const { store, state, tidy } = useLive()
+  const { store, state, tidy, activeTopicId } = useLive()
   const flow = useReactFlow<MapNode>()
   const wrapper = useRef<HTMLDivElement>(null)
   const [dragged, setDragged] = useState<Card | null>(null)
@@ -135,10 +135,12 @@ function Flow({ canvas, dispatch, initialViewport, onZoom }: MapCanvasProps) {
       }
       if (key === 'f') void flow.fitView(FIT)
       if (key === 't') tidy()
+      // P pins the topic on the table (UI_SPEC §4.6); Ctrl+Z takes it back.
+      if (key === 'p' && activeTopicId) pinTopic(store, activeTopicId)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [store, flow, tidy])
+  }, [store, flow, tidy, activeTopicId])
 
   const onNodeDragStop: OnNodeDrag<MapNode> = (_event, node) => {
     if (node.type !== 'topic') return
