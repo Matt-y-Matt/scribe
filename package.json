@@ -19,6 +19,7 @@
     "check": "tsc --noEmit && eslint . --max-warnings 0 && prettier --check . && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "test": "vitest run && cargo test --manifest-path src-tauri/Cargo.toml",
     "replay": "tsx scripts/replay.ts",
+    "golden": "tsx scripts/golden.ts",
     "screenshot": "tsx scripts/screenshot.ts",
     "ipc": "cargo test --manifest-path src-tauri/Cargo.toml export_ipc -- --ignored"
   },

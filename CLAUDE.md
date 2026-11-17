@@ -24,6 +24,7 @@ Scribe is a Windows desktop meeting secretary: it records the room, transcribes 
 - `pnpm test` = `vitest run` · `cargo test`
 - `pnpm format` — prettier and `cargo fmt` · `pnpm ipc` — regenerate `src/ipc.ts` from `src-tauri/src/ipc.rs`
 - `pnpm replay fixtures/meeting-custore-weekly.jsonl --speed 10` — plays a transcript into the engine without audio
+- `pnpm golden --provider mock|ollama|anthropic` — replays the fixture through the engine and prints the golden score (TEST_PLAN §2); Anthropic reads `ANTHROPIC_API_KEY`
 - `pnpm screenshot` — Playwright screenshots of every screen state into `.screenshots/<state>.<light|dark>.png` (git-ignored)
 
 ## Layout
