@@ -17,15 +17,17 @@
 ## 2. Golden test (M1 gate)
 Input: `fixtures/meeting-custore-weekly.jsonl` replayed at 10× with simulated silences. Output: the engine's topics, cards, suggestions.
 Scoring (implement in `tests/golden.ts`):
-- Topic coverage: for each expected topic, ≥ 80% of its `must_cover_segments` are attached to cards under one engine topic whose header matches (or `off_agenda` for aircon/pop-up). Score per topic 0/1.
-- Card match: an expected card matches an engine card when kind is equal, owner is equal (or both blank), and segment overlap ≥ 1. Score = matched / expected.
-- Pins: `suggest_pin` for aircon raised between s023 and s026, for pop-up between s041 and s042.
+- Topic coverage: for each expected topic, ≥ 80% of its `must_cover_segments` are cited (in `segment_ids`) by the cards or topics the engine placed under the matching header. Coverage is per agenda header, so the engine may split a header into several topics (CLA into Pricing and Artwork). For aircon and pop-up, the citing cards and topic must sit under one off-agenda topic. Score per expected topic 0/1.
+- Card match: an expected card matches an engine card when kind is equal, owner is equal (or both blank), and segment overlap ≥ 1. Matching is one-to-one: each engine card can satisfy at most one expected card (best assignment). Score = matched / expected.
+- Wrong owner: an engine action card is a wrong owner when it overlaps at least one expected action card by segment and its owner equals none of the owners of the expected action cards it overlaps. (s010 carries a Kabs action and a Matt action; either owner is right there.)
+- Pins: a `suggest_pin` exists for an off-agenda topic that cites at least one segment in s023–s026 (aircon), and another that cites at least one in s041–s042 (pop-up). The window is about which segments the suggestion cites, not when it was raised.
+- Pins at end: the test accepts every pin suggestion, standing in for the host tapping Pin, then checks `pins_at_end`. Speech in the meeting ("put a pin in it") never pins by itself.
 - Never rules: any violation fails the test outright.
-Pass: topic coverage 5/5, card match ≥ 0.80, both pins, 0 never-violations, and no op of type delete/rename accepted (assert on the op log). Record the score in `docs/NOTES.md` per provider (mock, Ollama Qwen3.5 4B, Anthropic Haiku).
+Pass: topic coverage 5/5, card match ≥ 0.80, both pins, `pins_at_end` met, 0 wrong owners, 0 never-violations, and no op of type delete/rename accepted (assert on the op log). Record the score in `docs/NOTES.md` per provider (mock, Ollama Qwen3.5 4B, Anthropic Haiku).
 Stability assertions (Playwright, same fixture): viewport transform unchanged after 20 card inserts; no topic node changes position unless the user drags or presses `T`.
 
 ## 3. Unit test list (minimum)
-TS: `applyOps` drops unknown/deleting ops · dedupe by segment coverage · owner fuzzy match ("Kabs"→Kabs, "Kabir"→Kabs, "Ross"→blank) · trigger logic (silence/word/elapsed cases, no overlap) · undo/redo depth 50 · intent parse for 10 classes · summary section ids round-trip after edit · ULID monotonicity.
+TS: `applyOps` drops unknown/deleting ops · dedupe by segment coverage · owner fuzzy match by Jaro-Winkler ≥ 0.8 ("Kabs"→Kabs, "Kabir"→Kabs, "Ross"→blank) · trigger logic (silence/word/elapsed cases, no overlap) · undo/redo depth 50 · intent parse for 10 classes · summary section ids round-trip after edit · ULID monotonicity.
 Rust: VAD splits a synthetic 40 s tone-with-gaps into expected utterances · 30 s max utterance · chunk writer recovers after truncation · dominant-speaker picks the loudest sustained track and ignores 100 ms spikes · SHA-256 mismatch rejects a model · `.ics` validates (RFC 5545 lines, CRLF) · Telegram message escaping.
 
 ## 4. Manual: live meeting (M2 gate)

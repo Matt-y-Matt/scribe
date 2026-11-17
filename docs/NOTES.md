@@ -15,9 +15,14 @@ Working notes: what is known, what is not verified, and what is still open. Deci
 - Run 3 (`4978088`): green on `windows-latest`. `pnpm check`, `pnpm test` (48 TypeScript, 3 Rust) and the start-up smoke test all passed, so the fix holds.
 - Stable cargo on CI warns that `tauri-plugin-sql` and `tauri-plugin-global-shortcut` are unused dependencies. Expected until M2 and M3 register them.
 
+### Verified on the reference PC (2026-11-17, Ryzen 5 2600, RTX 3070, Windows 10)
+- `pnpm install`, `pnpm check`, `pnpm test` and `pnpm tauri dev` all passed. The Scribe window opens on Home.
+- The window stops shrinking at the 1280 × 800 minimum, and the app follows the Windows dark-mode setting.
+- `pnpm install` failed once while pnpm switched itself to the pinned 10.28.0; a retry worked with no changes.
+- Commands must be run from `C:\dev\scribe`. From any other folder pnpm reports `Command "tauri" not found`.
+
 ### Not verified
-- **The app has not been launched.** M0 was built in a Linux container, which can compile, lint and test the Rust core but cannot open the Windows app. Run `pnpm tauri dev` once on the PC and confirm the window opens on Home.
-- Settings persistence through `tauri-plugin-store` (`src/lib/settings.ts`) is unit-tested with a mock only; it first runs for real under `pnpm tauri dev`.
+- Settings persistence through `tauri-plugin-store` (`src/lib/settings.ts`) is unit-tested with a mock only. Nothing in the UI writes a setting yet, so no store file exists on the PC.
 
 ### First run on the Windows PC
 1. `pnpm install`
@@ -41,16 +46,11 @@ Working notes: what is known, what is not verified, and what is still open. Deci
 
 Raised at kickoff, not yet answered. Fix them in the docs before the session that needs them.
 
-### Golden test — before M1
-- **G1** The answer key cannot pass its own scoring. Counting exactly the expected cards, topic coverage is CLA 9/15, suppliers 4/6, designer 2/6, aircon 0/3, pop-up 0/1, all under the 80% in TEST_PLAN §2.
-- **G2** "≥ 80% under one engine topic": the wireframe and the scribe script assume CLA splits into Pricing and Artwork, and then no single topic reaches 80% of CLA's segments.
-- **G3** Pin timing. PRD F5.1 waits 60 s off-topic; ARCHITECTURE §3.2 suggests a pin immediately; the fixture windows are 36.7 s (aircon) and 21.9 s (pop-up). The fixture has no silence of 2 s or more (longest gap 0.8 s), so only the 45 s rule fires. Does "between s023 and s026" refer to the suggestion's segments? Is the 45 s meeting time or wall time (at 10× the whole fixture is 38 s)?
-- **G4** `pins_at_end`: nobody confirms a pin during a replay. Does Matt saying "put a pin in it" in the meeting count, does the test auto-accept, or is this unscored?
-- **G5** Card matching: is it one-to-one, and what counts as a wrong owner where s010 carries both a Kabs action and a Matt action?
-- **G6** Owner fuzzy match ≥ 0.8: the metric is not named. "Kabir" → Kabs is 0.85 by Jaro-Winkler and 0.6 by Levenshtein ratio.
+### Golden test
+G1–G6 are answered (2026-11-17): see `docs/DECISIONS.md` and the scoring rules in `docs/TEST_PLAN.md` §2.
 
 ### Later milestones
-- **L1 (M1)** Rule 4 forbids transcript text leaving without the cloud switch, but the switch is defined only for Speechmatics. A cloud LLM provider sends transcript text regardless, and the M1 gate allows Anthropic.
+- **L1** Answered (2026-11-17): a non-local AI provider is cloud mode. The exact confirmation copy is still to be written with the Settings AI tab.
 - **L2 (M2)** PRD F3.5 and M2 require a transcript panel; the UI_SPEC §2 layout has no place for it.
 - **L3** No milestone owns: Home list and search, the Pre-meeting sheet, the Settings shell, Speechmatics cloud transcription, the Ctrl+K palette, solo mode, the minimum-spec check. M2's manual test already needs the first three.
 - **L4** Pause is "one click" and "within 300 ms", but the status strip uses a 300 ms hold-to-confirm.

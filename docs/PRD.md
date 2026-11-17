@@ -48,7 +48,7 @@ Format: ID, requirement, acceptance criteria (testable). Priority: P0 = v1 block
 
 ### F4 Live map (P0)
 - F4.1 Map data model: headers → topics → cards. Card kinds: note, decision, action (owner, due), research, quote. See ARCHITECTURE §Data model.
-- F4.2 Structurer runs when (silence ≥ 2 s and ≥ 25 new words) or (45 s elapsed and ≥ 25 new words); one run in flight; latest queued. AC: on the replay fixture at 10× speed, no run is skipped and runs do not overlap.
+- F4.2 Structurer runs when (silence ≥ 2 s and ≥ 25 new words) or (45 s elapsed and ≥ 25 new words), both measured on the meeting clock; one run in flight; latest queued. AC: on the replay fixture at 10× speed, no run is skipped and runs do not overlap.
 - F4.3 Structurer output is additive: add_card, add_topic, suggest_move, suggest_merge, suggest_pin. AC: the engine rejects any op that deletes or renames; such ops are logged and dropped.
 - F4.4 New cards appear at the end of their topic with a 150 ms fade; the viewport does not jump. AC: Playwright test asserts the viewport transform is unchanged after 20 inserts.
 - F4.5 Suggested moves render as dashed ghosts with Accept / Dismiss. AC: nothing moves until Accept; Dismiss removes the ghost and records the dismissal so the same suggestion is not repeated within the meeting.
@@ -57,7 +57,7 @@ Format: ID, requirement, acceptance criteria (testable). Priority: P0 = v1 block
 - F4.8 Golden replay test passes (TEST_PLAN §Golden). AC: ≥ 80% of expected cards matched by kind + owner + segment overlap; 0 wrong owners; both off-agenda pin suggestions raised in the expected windows.
 
 ### F5 Pins (P0)
-- F5.1 Off-topic detection: when new text does not fit any header or existing topic for ≥ 60 s, the structurer returns suggest_pin with a proposed title. AC: fixture raises aircon and pop-up suggestions in their windows.
+- F5.1 Off-topic detection: when new text does not fit any header or existing topic, the structurer creates an off-agenda topic and returns suggest_pin with a proposed title. There is no waiting period; it is a suggestion, and nothing is pinned until someone confirms. AC: fixture raises aircon and pop-up suggestions in their windows.
 - F5.2 Pin card appears in the map header area and in the Pins rail: "New topic: X. Pin it?" with Pin / Keep here. AC: no sound; no modal.
 - F5.3 Voice: "pin it", "pin this", "put a pin in it" pins the current topic. AC: works via hotkey and wake word.
 - F5.4 Pins rail: list with time pinned, gist, Revisit now, Schedule. AC: Revisit makes it the active topic and marks the time; Schedule produces an .ics draft on the end screen (Google Calendar OAuth is P2).
@@ -105,7 +105,7 @@ Format: ID, requirement, acceptance criteria (testable). Priority: P0 = v1 block
 
 ### F12 Settings and onboarding (P0)
 - F12.1 First run: choose mic, download model, set hotkey, optional LLM key, optional Telegram bot token. AC: completable in under 5 minutes on the reference PC.
-- F12.2 LLM provider: Ollama (local, default if detected), Anthropic API key, OpenAI-compatible endpoint. AC: a "test" button proves the provider works before saving.
+- F12.2 LLM provider: Ollama (local, default if detected), Anthropic API key, OpenAI-compatible endpoint. Any provider that is not on this PC counts as cloud: choosing it needs a confirmation that names the vendor and says transcript text will leave the PC, and the status strip shows "cloud" while it is in use. AC: a "test" button proves the provider works before saving; a non-local provider cannot be saved without the confirmation.
 - F12.3 Minimum spec check: 4 cores, 8 GB RAM, AVX2; show a warning otherwise.
 
 ### F13 Solo mode (P1)

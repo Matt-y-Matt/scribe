@@ -40,7 +40,7 @@ Scribe is a Windows desktop meeting secretary: it records the room, transcribes 
 1. The map only grows during a meeting. Moves, merges and deletes are suggestions until a person confirms. Undo for everything.
 2. Nothing is sent to anyone without the host confirming on the end screen.
 3. The recording indicator is always visible; pause is one click from every screen, including phones.
-4. Local by default: no network call carries audio or transcript text unless the user turned the cloud switch on. Research and dispatch are the only exceptions, and they are user-triggered.
+4. Local by default: no network call carries audio or transcript text unless the user turned the cloud switch on. Choosing an AI provider that is not on this PC is a cloud switch too. Research and dispatch are the only exceptions, and they are user-triggered.
 5. The scribe never speaks unprompted in group mode and never interrupts a speaker.
 6. Never log transcript text, audio paths or API keys at info level.
 7. New dependency = note its licence in `docs/DECISIONS.md`. No GPL/AGPL/LGPL/custom-licence code in the app.

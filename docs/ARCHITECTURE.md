@@ -61,7 +61,7 @@ settings(key, value_json)
 Ids: ULIDs generated client-side (`c_…`, `t_…`); the LLM never mints ids. It refers to existing topics by id and proposes new topics with a `tmp_key` that the engine resolves.
 
 ### 3.2 Structurer loop
-Trigger: `(silence ≥ 2000 ms && newWords ≥ 25) || (elapsedSinceRun ≥ 45 s && newWords ≥ 25)`. One run in flight; if a trigger fires during a run, run again immediately after with everything new. Runs in a Web Worker.
+Trigger: `(silence ≥ 2000 ms && newWords ≥ 25) || (elapsedSinceRun ≥ 45 s && newWords ≥ 25)`. Silence and elapsed time are measured on the meeting clock (segment timestamps), so a replay at N× triggers at the same points in the meeting as a live session. One run in flight; if a trigger fires during a run, run again immediately after with everything new. Runs in a Web Worker.
 
 Input (JSON) to the LLM:
 ```
@@ -82,7 +82,7 @@ ops: Array<
  | {op:"suggest_pin", tmp_key_or_topic_id: string, title: string, reason: string}
 >
 ```
-Engine rules on apply: drop any op not in the schema; drop add_card with empty segment_ids; `off_agenda` topics are created under the "Unplanned" column with a `suggest_pin`; owners must match a participant name (fuzzy ≥ 0.8) or are left blank; a card whose segment_ids are all already covered by an accepted card of the same kind is dropped (dedupe); never delete, never rename.
+Engine rules on apply: drop any op not in the schema; drop add_card with empty segment_ids; `off_agenda` topics are created under the "Unplanned" column with a `suggest_pin`; owners must match a participant name (Jaro-Winkler ≥ 0.8) or are left blank; a card whose segment_ids are all already covered by an accepted card of the same kind is dropped (dedupe); never delete, never rename.
 
 System prompt skeleton (keep in `src/engine/prompts/structurer.md`): role; rules (additive only, prefer attaching to existing topics, decisions must be explicit statements of what was agreed, actions need a person and a verb, do not create cards from agenda statements or recaps, off-agenda = does not fit any header or topic after reading the new text); output format; 3 short examples from the fixture.
 
@@ -111,7 +111,7 @@ Copy by commit with LICENSE files; record commit SHAs in `docs/DECISIONS.md`.
 
 ## 6. Secrets, privacy, retention
 - Keys in `tauri-plugin-store` (plaintext) for v1; migrate to OS keychain in v1.1.
-- Local mode: the only outbound connections are LiveKit (if phones joined) and the token function. The network test in TEST_PLAN enforces this.
+- Local mode: the only outbound connections are LiveKit (if phones joined) and the token function. An LLM provider that is not on this PC (Anthropic, a remote OpenAI-compatible endpoint) is cloud mode, not local: it sends transcript text, needs its own confirmation and shows the cloud pill (PRD F12.2). The network test in TEST_PLAN enforces this.
 - Retention job on app start and daily: delete audio chunks past the setting; log to `consent_log` as `retention_delete`.
 - Logs: `tauri-plugin-log`, info level never includes transcript text, audio paths or keys.
 
