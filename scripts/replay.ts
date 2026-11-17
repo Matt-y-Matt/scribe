@@ -1,7 +1,8 @@
 // `pnpm replay fixtures/<name>.jsonl --speed 10`
 // Plays a transcript fixture without audio and prints each segment as it
-// becomes final. In M0 the sink is the console; the map engine takes its place
-// in M1 (docs/BUILD_PLAN.md).
+// becomes final. The sink here is the console. To play the same fixture into
+// the map engine and score the result, use `pnpm golden` (scripts/golden.ts),
+// which feeds the structurer through the same SegmentSink interface.
 import { readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import {

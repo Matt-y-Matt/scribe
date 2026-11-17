@@ -42,6 +42,40 @@ Working notes: what is known, what is not verified, and what is still open. Deci
 - Local `cargo clippy` / `cargo test` on Linux need `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev`. They are not part of the Windows build.
 - The replay sink only receives `segment:final`. With finals alone the engine cannot tell a long utterance in progress from silence, so the "silence ≥ 2 s" trigger needs either the utterance start time or a VAD event (see G3).
 
+## M1 — Map engine on replay (2026-11-17)
+
+Built on the reference PC, in the order of the approved plan below, one commit per step.
+
+### Gate results
+- `pnpm check && pnpm test`: green on the PC. 171 TypeScript tests, 3 Rust tests.
+- `pnpm e2e`: 13 Playwright tests green (Chromium, 1280 × 800).
+- **Golden replay, MockProvider** (`pnpm golden --provider mock`, and `src/engine/golden/golden.test.ts` in CI): **PASS**. Topic coverage 5/5 (CLA 14/15, suppliers 6/6, designer 6/6, aircon 3/3, pop-up 1/1). Card match 17/17 (100%). Wrong owners 0. Both pins suggested and pinned at the end. Never rules: 0 violated. 8 runs, none skipped, none overlapping. The mock's ops are written by hand against the transcript, so this score checks the engine and the scoring, not a model.
+- **Golden replay, real provider: not run yet.** Ollama does not answer at `http://127.0.0.1:11434` on the PC (it is not installed), so the real provider is Anthropic Haiku (`claude-haiku-5-5`), and no key has been set. Run `pnpm golden --provider anthropic --map` with `ANTHROPIC_API_KEY` set, record the score here, and tune `src/engine/prompts/structurer.md` if it fails. **The M1 gate is not met until this line has a passing score.**
+- Viewport: the transform is unchanged after 20 card inserts (Playwright), and after a card drag.
+- `pnpm screenshot`: `live`, `live-ghost`, `live-unplanned`, `live-zoomed-out` in light and dark, reviewed against UI_SPEC §2 and §5.
+
+### Not verified
+- Nothing from M1 has been pushed: the PC has no GitHub credentials for this shell, so the nine M1 commits are local and the Windows CI run with the new Playwright step has not happened.
+- The Ollama provider has never talked to an Ollama server. Its request is unit-tested against a mock model only.
+- The Anthropic provider has not made a real call (see above).
+- The live screen has been opened in Chromium (Playwright) only, not inside the Tauri window. `pnpm tauri dev` still opens on Home, and nothing in the app navigates to the live screen yet.
+- `structurer.worker.ts` has never run as a real Web Worker. Both ends of its protocol are tested through an in-memory port.
+
+### Built differently from the spec, for Matt to confirm
+- **A topic that grows pushes the topics below it down.** TEST_PLAN §2 says no topic node changes position unless the user drags or presses `T`. With topics stacked in a column and cards arriving, the only way to keep that literally is to let topics overlap. What is guaranteed and tested: the viewport never moves, a grown topic moves only the topics under it in the same column and by exactly its growth, and a dragged topic stays put until tidy (DECISIONS, 2026-11-17).
+- `Esc` dismisses a ghost only while that ghost has focus. There is no global "cancel ghost" key, because a dismissal is remembered for the rest of the meeting.
+
+### Things M1 left unfinished
+- No UI to edit a card (change kind, owner, due text) or delete one. The engine has `editCard` and `deleteCard`, both undoable; PRD F4.6 needs the controls.
+- A click on a card does nothing yet. It seeks the timeline in M2.
+- The fixture transcript and the mock ops are bundled into the app, because the `?screen=` states are part of the app build. `vite build` warns that the main chunk is over 500 kB.
+- A few "ResizeObserver loop completed with undelivered notifications" errors still reach the dev console when a column re-lays itself out. They are harmless; the Playwright tests ignore that one message.
+- The right-hand column below the Pins rail is empty until the scribe panel (M3).
+
+### For the next session
+- `pnpm golden --provider ollama` checks that Ollama answers and has `qwen3.5:4b`; if it does not, it says to run `ollama pull qwen3.5:4b`.
+- The structurer prompt has three examples taken from the golden fixture itself (BUILD_PLAN asks for that). A second fixture would show whether the prompt generalises.
+
 ## M1 — approved plan (2026-11-17)
 
 Approved by Matt. Build on the reference PC in a fresh session, in this order, one commit per step, `pnpm check && pnpm test` before each. Scoring rules are in `docs/TEST_PLAN.md` §2; the answers behind them are in `docs/DECISIONS.md`.
