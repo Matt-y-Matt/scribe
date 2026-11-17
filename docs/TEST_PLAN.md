@@ -16,7 +16,7 @@
 
 ## 2. Golden test (M1 gate)
 Input: `fixtures/meeting-custore-weekly.jsonl` replayed at 10× with simulated silences. Output: the engine's topics, cards, suggestions.
-Scoring (implement in `tests/golden.ts`):
+Scoring (`src/engine/golden/score.ts`, run by `src/engine/golden/golden.test.ts` with the mock and by `pnpm golden --provider <name>` with a real model):
 - Topic coverage: for each expected topic, ≥ 80% of its `must_cover_segments` are cited (in `segment_ids`) by the cards or topics the engine placed under the matching header. Coverage is per agenda header, so the engine may split a header into several topics (CLA into Pricing and Artwork). For aircon and pop-up, the citing cards and topic must sit under one off-agenda topic. Score per expected topic 0/1.
 - Card match: an expected card matches an engine card when kind is equal, owner is equal (or both blank), and segment overlap ≥ 1. Matching is one-to-one: each engine card can satisfy at most one expected card (best assignment). Score = matched / expected.
 - Wrong owner: an engine action card is a wrong owner when it overlaps at least one expected action card by segment and its owner equals none of the owners of the expected action cards it overlaps. (s010 carries a Kabs action and a Matt action; either owner is right there.)

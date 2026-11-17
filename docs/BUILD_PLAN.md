@@ -32,7 +32,7 @@ Tasks
 3. `src/engine/prompts/structurer.md` with 3 fixture examples; a `MockProvider` that returns canned ops from `fixtures/*.mock-ops.json` for CI.
 4. Map UI: React Flow + dagre layout, header columns, topic nodes rendering card rows, ghost suggestions, Unplanned column, minimap, fit/tidy, zoom collapse at 0.7.
 5. Pins rail; pin/revisit/schedule actions; `P` key.
-6. Golden test: `tests/golden.test.ts` scores engine output against `fixtures/meeting-custore-weekly.expected.json` (rules in TEST_PLAN).
+6. Golden test: `src/engine/golden/golden.test.ts` scores engine output against `fixtures/meeting-custore-weekly.expected.json` (rules in TEST_PLAN).
 7. Playwright: viewport-stability test (20 inserts, transform unchanged), ghost accept/dismiss, drag card between topics, undo.
 Done: gate above with a real provider (Ollama Qwen3.5 4B or Anthropic Haiku) and with the mock in CI.
 

@@ -77,4 +77,4 @@ G1–G6 are answered (2026-11-17): see `docs/DECISIONS.md` and the scoring rules
 - **L5** "No red except the indicator" against Start recording turning red on hover and the phone's red-outline Pause.
 - **L6 (M3)** The wake-word chime against silent group mode.
 - **L7 (M4)** "QR with a one-time token" against one code per meeting that mints per-phone tokens.
-- **L8** The golden test is `tests/golden.test.ts` in BUILD_PLAN and `tests/golden.ts` in TEST_PLAN. Research is a TS file in ARCHITECTURE §3.3 but fetches through Rust.
+- **L8** Research is a TS file in ARCHITECTURE §3.3 but fetches through Rust. (The golden test's path is settled: `src/engine/golden/`, and BUILD_PLAN and TEST_PLAN now say so.)

@@ -15,3 +15,4 @@ docs/
 prompts/
 fixtures/*.jsonl
 fixtures/*.expected.json
+fixtures/*.mock-ops.json
