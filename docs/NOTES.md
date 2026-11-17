@@ -42,6 +42,26 @@ Working notes: what is known, what is not verified, and what is still open. Deci
 - Local `cargo clippy` / `cargo test` on Linux need `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev`. They are not part of the Windows build.
 - The replay sink only receives `segment:final`. With finals alone the engine cannot tell a long utterance in progress from silence, so the "silence ≥ 2 s" trigger needs either the utterance start time or a VAD event (see G3).
 
+## M1 — approved plan (2026-11-17)
+
+Approved by Matt. Build on the reference PC in a fresh session, in this order, one commit per step, `pnpm check && pnpm test` before each. Scoring rules are in `docs/TEST_PLAN.md` §2; the answers behind them are in `docs/DECISIONS.md`.
+
+1. **Engine model and op log** — `src/engine/model.ts`, `store.ts`. Types for topics, cards and suggestions; in-memory store with undo/redo 50 deep behind a persistence adapter (SQLite replaces it in M2). Tests first.
+2. **Apply rules** — `apply.ts`, `owner.ts`. Validate ops with zod; drop anything that deletes or renames (logged, never applied); drop `add_card` with no `segment_ids`; resolve `tmp_key`; put off-agenda topics under "Unplanned" with a `suggest_pin`; match owners by Jaro-Winkler ≥ 0.8 or leave blank; dedupe by segment coverage. Tests first, including the list in TEST_PLAN §3.
+3. **Structurer loop** — `trigger.ts`, `structurer.ts`, `structurer.worker.ts`, `prompts/structurer.md`. Triggers measured on the meeting clock; one run in flight; latest queued. The replay harness (`src/engine/replay/`) feeds it through `SegmentSink`.
+4. **MockProvider and golden test** — `fixtures/meeting-custore-weekly.mock-ops.json`, with each canned op keyed by the segments it cites so that batching cannot change the result. Scoring in `src/engine/golden/score.ts`, test in `src/engine/golden/golden.test.ts` (tests sit next to the code; BUILD_PLAN and TEST_PLAN name other paths and should be corrected to this one).
+5. **Real provider** — Ollama (OpenAI-compatible) and Anthropic behind one interface on the Vercel AI SDK. `pnpm golden --provider mock|ollama|anthropic` prints the score. Use Ollama if `http://127.0.0.1:11434` answers, otherwise ask Matt for an Anthropic key (Haiku). Only the fixture is ever sent.
+6. **Map UI** — `src/screens/live/`. React Flow with header columns as group nodes, topic nodes that render their cards as rows (cards are not React Flow nodes), ghost suggestions with Accept / Dismiss, the Unplanned column, minimap, fit, tidy, zoom collapse below 0.7. dagre layout; a dragged node keeps its place until tidy. No auto-pan, no auto-zoom.
+7. **Pins rail** — pin, revisit and schedule actions; the `P` key pins the active topic.
+8. **Playwright tests** — `playwright.config.ts`, `e2e/`. Viewport transform unchanged after 20 inserts; ghost accept and dismiss; drag a card between topics; undo. Add them to CI (`pnpm exec playwright install chromium` first).
+9. **Screenshots** — add `live`, `live-ghost`, `live-unplanned`, `live-zoomed-out` to `src/screens/screens.ts`; review light and dark against UI_SPEC §2 and §5.
+
+Out of scope for M1: status strip, transcript panel, timeline, scribe panel, SQLite, anything audio. The live screen shows the map and the Pins rail only.
+
+New dependency: `lucide-react` (ISC) for card-kind icons. Build the "⋯" menu on `@base-ui/react`, which is already installed; if a shadcn component is added instead, restyle it to the tokens (CLAUDE.md §Conventions).
+
+Done means the M1 gate in BUILD_PLAN: golden replay ≥ 80% card match, 5/5 topic coverage, 0 wrong owners, both pins, with the mock in CI and with one real provider; the score for each provider recorded in this file; `live.png` and `live-ghost.png` shown to Matt.
+
 ## Open spec questions
 
 Raised at kickoff, not yet answered. Fix them in the docs before the session that needs them.
