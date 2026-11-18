@@ -32,6 +32,10 @@ tauri-plugin-global-shortcut = "2"
 audio-actual = { path = "../crates/vendor/anarlog/audio-actual" }
 anlg-audio = { path = "../crates/vendor/anarlog/audio", package = "audio" }
 vad = { path = "../crates/vendor/anarlog/vad", features = ["silero-onnx"] }
+# Playback of the recording: rodio, and the vendored helper that opens the
+# output device.
+anlg-audio-utils = { path = "../crates/vendor/anarlog/audio-utils", package = "audio-utils" }
+rodio = { version = "0.22", default-features = false, features = ["playback"] }
 # Speech to text: the official sherpa-onnx bindings (DECISIONS 2026-11-19).
 sherpa-onnx = "2.0.1"
 hound = "3.5"

@@ -43,7 +43,24 @@ jobs:
 
       - run: pnpm check
 
-      - run: pnpm test
+      - name: pnpm test
+        shell: pwsh
+        run: |
+          pnpm test 2>&1 | Tee-Object -FilePath test-output.txt
+          exit $LASTEXITCODE
+
+      # The job log can only be read by the repository's admins. Annotations
+      # can be read by anyone who can see the run, so the lines that say what
+      # failed are repeated there.
+      - name: Say what failed
+        if: failure()
+        shell: pwsh
+        run: |
+          if (Test-Path test-output.txt) {
+            Select-String -Path test-output.txt -Pattern 'FAILED|panicked|^error|AssertionError|LNK\d+|left:|right:|×' |
+              Select-Object -First 9 |
+              ForEach-Object { "::error::$($_.Line.Trim())" }
+          }
 
       # UI behaviour (docs/TEST_PLAN.md §1): Playwright against `vite dev`.
       - run: pnpm exec playwright install chromium

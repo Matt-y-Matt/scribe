@@ -13,12 +13,15 @@ use tauri::State;
 use tauri_specta::{collect_commands, collect_events, Builder, Event};
 use tokio_util::sync::CancellationToken;
 
+use crate::audio::playback::PlaybackState;
+use crate::audio::SourceKind;
 use crate::session::recovery::{self, Recovered};
 use crate::session::{
-    AudioLevels, AudioPeaks, CaptureStatus, RecordingState, SessionError, StartOptions,
+    audio_dir, peaks_path, AudioLevels, AudioPeaks, CaptureStatus, RecordingState, SessionError,
+    StartOptions,
 };
 use crate::state::AppState;
-use crate::store::{MapPatch, MapRows, MeetingInfo, NewMeeting};
+use crate::store::{Highlight, MapPatch, MapRows, MeetingInfo, NewMeeting};
 use crate::stt::models::{self, Downloader};
 
 /// `segment:final` — one finished utterance of the meeting transcript.
@@ -66,6 +69,7 @@ event!(AudioLevels, "audio:levels");
 event!(AudioPeaks, "audio:peaks");
 event!(CaptureStatus, "capture:status");
 event!(ModelDownload, "model:download");
+event!(PlaybackState, "playback:state");
 
 /// Why a command failed, in a form the UI can act on.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type, thiserror::Error)]
@@ -85,6 +89,8 @@ pub enum AppError {
     AlreadyRecorded,
     #[error("storage error: {0}")]
     Storage(String),
+    #[error("the local AI did not answer: {0}")]
+    LocalAi(String),
 }
 
 impl From<SessionError> for AppError {
@@ -356,6 +362,127 @@ pub async fn map_save(state: State<'_, AppState>, patch: MapPatch) -> CommandRes
     Ok(state.store.map_save(&patch).await?)
 }
 
+// ---- timeline ---------------------------------------------------------------
+
+/// The waveform of a meeting so far: 20 peaks per second, each 0–255.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_peaks(state: State<'_, AppState>, meeting_id: String) -> CommandResult<Vec<u8>> {
+    let path = peaks_path(&state.data_dir, &meeting_id);
+    match tokio::fs::read(path).await {
+        Ok(peaks) => Ok(peaks),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(error) => Err(AppError::Storage(error.to_string())),
+    }
+}
+
+fn recording_dirs(state: &AppState, meeting_id: &str) -> Vec<std::path::PathBuf> {
+    SourceKind::ALL
+        .into_iter()
+        .map(|source| audio_dir(&state.data_dir, meeting_id, source))
+        .collect()
+}
+
+/// Plays the recording from a point to its end.
+#[tauri::command]
+#[specta::specta]
+pub async fn seek_play(
+    state: State<'_, AppState>,
+    meeting_id: String,
+    t_ms: u32,
+) -> CommandResult<()> {
+    state
+        .playback
+        .play(&meeting_id, recording_dirs(&state, &meeting_id), t_ms, None);
+    Ok(())
+}
+
+/// Plays one span of the recording: a segment, a card, a highlight.
+#[tauri::command]
+#[specta::specta]
+pub async fn play_span(
+    state: State<'_, AppState>,
+    meeting_id: String,
+    t0_ms: u32,
+    t1_ms: u32,
+) -> CommandResult<()> {
+    state.playback.play(
+        &meeting_id,
+        recording_dirs(&state, &meeting_id),
+        t0_ms,
+        Some(t1_ms.max(t0_ms)),
+    );
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn stop_playback(state: State<'_, AppState>) -> CommandResult<()> {
+    state.playback.stop();
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn list_highlights(
+    state: State<'_, AppState>,
+    meeting_id: String,
+) -> CommandResult<Vec<Highlight>> {
+    Ok(state.store.highlights(&meeting_id).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn save_highlight(state: State<'_, AppState>, highlight: Highlight) -> CommandResult<()> {
+    Ok(state.store.save_highlight(&highlight).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_highlight(
+    state: State<'_, AppState>,
+    highlight_id: String,
+) -> CommandResult<()> {
+    Ok(state.store.delete_highlight(&highlight_id).await?)
+}
+
+// ---- local AI ---------------------------------------------------------------
+
+/// Ollama on this PC. The address is fixed here, so the webview cannot use
+/// this command to reach any other host.
+const OLLAMA_CHAT_URL: &str = "http://127.0.0.1:11434/api/chat";
+
+/// Sends one chat request to the Ollama running on this PC and returns its
+/// reply, both as Ollama's own JSON. The structurer calls this instead of
+/// fetching from the webview: the webview keeps a content security policy
+/// with no network access, and Ollama refuses the installed app's origin.
+#[tauri::command]
+#[specta::specta]
+pub async fn ollama_chat(state: State<'_, AppState>, body: String) -> CommandResult<String> {
+    let response = state
+        .http
+        .post(OLLAMA_CHAT_URL)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .timeout(Duration::from_secs(180))
+        .body(body)
+        .send()
+        .await
+        .map_err(|error| AppError::LocalAi(error.without_url().to_string()))?;
+    let status = response.status();
+    let text = response
+        .text()
+        .await
+        .map_err(|error| AppError::LocalAi(error.without_url().to_string()))?;
+    if !status.is_success() {
+        // Ollama's own error line (model missing, out of memory); never ours.
+        let detail: String = text.chars().take(200).collect();
+        return Err(AppError::LocalAi(format!(
+            "Ollama answered {status}: {detail}"
+        )));
+    }
+    Ok(text)
+}
+
 // ---- recovery ---------------------------------------------------------------
 
 /// Meetings that were being recorded when the app last died.
@@ -407,6 +534,14 @@ pub fn builder() -> Builder<tauri::Wry> {
             search_segments,
             map_load,
             map_save,
+            get_peaks,
+            seek_play,
+            play_span,
+            stop_playback,
+            list_highlights,
+            save_highlight,
+            delete_highlight,
+            ollama_chat,
             unfinished_meetings,
             recover_meeting,
         ])
@@ -417,6 +552,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             AudioPeaks,
             CaptureStatus,
             ModelDownload,
+            PlaybackState,
         ])
 }
 

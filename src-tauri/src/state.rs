@@ -3,12 +3,13 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use tauri_specta::Event;
 use tokio_util::sync::CancellationToken;
 
 use crate::audio::capture::{DeviceSource, FileSource, Source};
+use crate::audio::playback::Playback;
 use crate::audio::vad::{EnergyDetector, SileroDetector, SpeechDetector};
 use crate::ipc::SegmentFinal;
 use crate::session::{
@@ -26,6 +27,9 @@ pub struct AppState {
     pub deps: SessionDeps,
     /// Running model downloads, by model id.
     pub downloads: Arc<tokio::sync::Mutex<HashMap<String, CancellationToken>>>,
+    pub playback: Playback,
+    /// For the one local HTTP call the core makes: Ollama on this PC.
+    pub http: reqwest::Client,
 }
 
 /// Sends the session's news to the webview as typed Tauri events.
@@ -78,10 +82,28 @@ fn detector() -> Box<dyn SpeechDetector> {
     }
 }
 
-fn load_model(data_dir: &Path, model_id: &str) -> Result<Arc<dyn Transcriber>, SttError> {
+/// The speech model last used, kept loaded: reading 650 MB from disk takes
+/// seconds, and the second meeting of the day should not wait for it.
+type LoadedModel = Mutex<Option<(String, Arc<dyn Transcriber>)>>;
+
+fn load_model(
+    loaded: &LoadedModel,
+    data_dir: &Path,
+    model_id: &str,
+) -> Result<Arc<dyn Transcriber>, SttError> {
+    let mut loaded = loaded
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some((id, model)) = loaded.as_ref() {
+        if id == model_id {
+            return Ok(model.clone());
+        }
+    }
     let spec = models::spec(model_id).ok_or(SttError::NotInstalled)?;
-    let model = LocalSherpa::load(spec, data_dir, default_threads(), "cpu")?;
-    Ok(Arc::new(model))
+    let model: Arc<dyn Transcriber> =
+        Arc::new(LocalSherpa::load(spec, data_dir, default_threads(), "cpu")?);
+    *loaded = Some((model_id.to_string(), model.clone()));
+    Ok(model)
 }
 
 impl AppState {
@@ -91,14 +113,27 @@ impl AppState {
             .await
             .map_err(|error| error.to_string())?;
         let models_dir = data_dir.clone();
+        let loaded = LoadedModel::default();
+        // True while the recording is being played back: the session then
+        // keeps system audio out of the transcript.
+        let playing = Arc::new(AtomicBool::new(false));
+        let playback = {
+            let app = app.clone();
+            Playback::spawn(
+                move |state| {
+                    let _ = state.emit(&app);
+                },
+                playing.clone(),
+            )
+        };
         let deps = SessionDeps {
             data_dir: data_dir.clone(),
             store: store.clone(),
             source: audio_source(),
             events: Arc::new(TauriEvents(app.clone())),
             detector: Arc::new(detector),
-            transcriber: Arc::new(move |model_id| load_model(&models_dir, model_id)),
-            mute_system: Arc::new(AtomicBool::new(false)),
+            transcriber: Arc::new(move |model_id| load_model(&loaded, &models_dir, model_id)),
+            mute_system: playing,
         };
         Ok(Self {
             data_dir,
@@ -106,6 +141,8 @@ impl AppState {
             session: Session::new(deps.clone()),
             deps,
             downloads: Arc::default(),
+            playback,
+            http: reqwest::Client::new(),
         })
     }
 }

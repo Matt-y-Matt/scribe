@@ -4233,11 +4233,13 @@ version = "0.1.0"
 dependencies = [
  "audio",
  "audio-actual",
+ "audio-utils",
  "futures-util",
  "hound",
  "log",
  "ndarray",
  "reqwest",
+ "rodio",
  "serde",
  "serde_json",
  "sha2 0.10.9",

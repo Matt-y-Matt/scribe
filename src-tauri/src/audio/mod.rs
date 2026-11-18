@@ -8,6 +8,7 @@
 pub mod capture;
 pub mod levels;
 pub mod peaks;
+pub mod playback;
 pub mod vad;
 pub mod writer;
 

@@ -1045,8 +1045,14 @@ mod tests {
 
         let paused = rig.session.pause().await.unwrap();
         assert_eq!(paused.state, RecState::Paused);
-        // The open utterance was closed by the pause, not lost.
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        // The open utterance was closed by the pause, not lost. The
+        // recogniser thread may still be starting on a slow machine.
+        for _ in 0..500 {
+            if !rig.events.segments.lock().unwrap().is_empty() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
         assert_eq!(rig.events.segments.lock().unwrap().len(), 1);
         let at_pause = rig.session.state().await.elapsed_ms;
         tokio::time::sleep(Duration::from_millis(300)).await;

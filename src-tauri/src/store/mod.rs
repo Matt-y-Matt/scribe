@@ -17,7 +17,7 @@ use specta::Type;
 use sqlx::sqlite::{
     SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteRow, SqliteSynchronous,
 };
-use sqlx::{Row, SqlitePool};
+use sqlx::{ConnectOptions, Row, SqlitePool};
 
 use crate::ipc::SegmentFinal;
 
@@ -257,7 +257,10 @@ impl Store {
             .journal_mode(SqliteJournalMode::Wal)
             .synchronous(SqliteSynchronous::Normal)
             .foreign_keys(true)
-            .busy_timeout(Duration::from_secs(5));
+            .busy_timeout(Duration::from_secs(5))
+            // Statements are not logged: the log is for what the app did, and
+            // a statement is one step from the text it stores (rule 6).
+            .disable_statement_logging();
         let pool = SqlitePoolOptions::new()
             .max_connections(4)
             .connect_with(options)
@@ -269,7 +272,9 @@ impl Store {
 
     /// A private database in memory, for tests.
     pub async fn in_memory() -> Result<Self> {
-        let options = SqliteConnectOptions::from_str("sqlite::memory:")?.foreign_keys(true);
+        let options = SqliteConnectOptions::from_str("sqlite::memory:")?
+            .foreign_keys(true)
+            .disable_statement_logging();
         // One connection: each connection to `:memory:` is its own database.
         let pool = SqlitePoolOptions::new()
             .max_connections(1)

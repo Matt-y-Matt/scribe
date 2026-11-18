@@ -161,6 +161,85 @@ async mapSave(patch: MapPatch) : Promise<Result<null, AppError>> {
 }
 },
 /**
+ * The waveform of a meeting so far: 20 peaks per second, each 0–255.
+ */
+async getPeaks(meetingId: string) : Promise<Result<number[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_peaks", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Plays the recording from a point to its end.
+ */
+async seekPlay(meetingId: string, tMs: number) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("seek_play", { meetingId, tMs }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Plays one span of the recording: a segment, a card, a highlight.
+ */
+async playSpan(meetingId: string, t0Ms: number, t1Ms: number) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("play_span", { meetingId, t0Ms, t1Ms }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async stopPlayback() : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_playback") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listHighlights(meetingId: string) : Promise<Result<Highlight[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_highlights", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async saveHighlight(highlight: Highlight) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_highlight", { highlight }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async deleteHighlight(highlightId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_highlight", { highlightId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Sends one chat request to the Ollama running on this PC and returns its
+ * reply, both as Ollama's own JSON. The structurer calls this instead of
+ * fetching from the webview: the webview keeps a content security policy
+ * with no network access, and Ollama refuses the installed app's origin.
+ */
+async ollamaChat(body: string) : Promise<Result<string, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("ollama_chat", { body }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Meetings that were being recorded when the app last died.
  */
 async unfinishedMeetings() : Promise<Result<MeetingInfo[], AppError>> {
@@ -189,6 +268,7 @@ audioLevels: AudioLevels,
 audioPeaks: AudioPeaks,
 captureStatus: CaptureStatus,
 modelDownload: ModelDownload,
+playbackState: PlaybackState,
 recordingState: RecordingState,
 segmentFinal: SegmentFinal
 }>({
@@ -196,6 +276,7 @@ audioLevels: "audio:levels",
 audioPeaks: "audio:peaks",
 captureStatus: "capture:status",
 modelDownload: "model:download",
+playbackState: "playback:state",
 recordingState: "recording:state",
 segmentFinal: "segment:final"
 })
@@ -209,7 +290,7 @@ segmentFinal: "segment:final"
 /**
  * Why a command failed, in a form the UI can act on.
  */
-export type AppError = { kind: "no_microphone" } | { kind: "capture"; detail: string } | { kind: "busy" } | { kind: "not_recording" } | { kind: "not_found" } | { kind: "already_recorded" } | { kind: "storage"; detail: string }
+export type AppError = { kind: "no_microphone" } | { kind: "capture"; detail: string } | { kind: "busy" } | { kind: "not_recording" } | { kind: "not_found" } | { kind: "already_recorded" } | { kind: "storage"; detail: string } | { kind: "local_ai"; detail: string }
 /**
  * Name and version of the running app.
  */
@@ -248,6 +329,7 @@ export type Devices = { microphones: string[];
  * `None` when the PC has no microphone.
  */
 default_microphone: string | null }
+export type Highlight = { id: string; meeting_id: string; t0_ms: number; t1_ms: number; label: string }
 export type MapEntity = "topic" | "card" | "suggestion"
 /**
  * One commit of the map engine: the rows as they are now, and the rows that
@@ -300,6 +382,11 @@ agenda: string[]; mode: MeetingMode;
  * Names of the people expected, for owner matching.
  */
 participants: string[] }
+/**
+ * `playback:state` — where the playhead is, about ten times a second while
+ * playing, and once when playing stops.
+ */
+export type PlaybackState = { meeting_id: string; playing: boolean; t_ms: number }
 export type RecState = "idle" | "recording" | "paused" | "stopped"
 /**
  * `recording:state`
