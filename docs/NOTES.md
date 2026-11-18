@@ -118,27 +118,31 @@ Built on the reference PC in the order of the approved plan below. Everything th
 - **Forced kill, in the real app.** A meeting was killed with `Stop-Process` 71 s in. On relaunch Home asked "Recover meeting “Bench kill”?"; Recover brought back 71.3 s of audio, the 17 transcript lines from before the kill plus one transcribed from the unheard tail, the 5 cards, and a timeline that plays. The same was done without the window (`soak.exe`): killed at 77 s, 75.1 s of audio and 18 segments recovered, 1 added.
 - **Timeline.** In the real app a click on the waveform had the playhead on screen 14 to 61 ms later; the core logged playback starting in 0 to 31 ms. A dragged region asked for a name and became a quote card.
 - **Screens.** `pnpm screenshot` writes 12 states in light and dark, among them `live`, `paused`, `nomic-error` and `model-missing`; reviewed against UI_SPEC §2.
-- **Tests.** 248 TypeScript tests, 56 Rust tests, 25 Playwright tests. No test needs a sound device or a model.
+- **Tests.** 248 TypeScript tests, 56 Rust tests, 25 Playwright tests. No test needs a sound device or a model. Windows CI is green on run 16 (`037e4de`). Runs 13 to 15 failed in `pnpm test` for a reason in the runner, not the code: its cache restored the folders of the sherpa-onnx download without the libraries in them, and the build script took the folder for a finished download. CI now removes both before building.
 
 ### Numbers (reference PC: Ryzen 5 2600, 16 GB, Windows 10; all on synthetic speech)
 `scripts/make_test_audio.ps1` reads the golden fixture aloud with Windows' two built-in voices: 7.4 minutes, 46 lines. It is clean, evenly paced American English with no room, so these numbers are a floor for real meetings, not a prediction.
 
 | What | Result |
 | --- | --- |
-| Parakeet, real-time factor (`bench_stt`, 352 s of speech in 112 utterances) | 0.28 at 2 threads, 0.21 at 4, 0.19 at 6 |
-| Parakeet, time to transcribe one utterance at 6 threads | median 0.51 s, 95th percentile 1.27 s, longest 2.33 s (a 13.8 s utterance, before the 10 s cut) |
-| Parakeet, model load | 4.3 s (kept loaded between meetings) |
-| Silero VAD | 4.4 s for 444 s of audio |
+| Parakeet, real-time factor (`scripts/bench_stt.ps1`, idle PC, 352 s of speech in 113 utterances) | 0.21 at 2 threads, 0.16 at 4, 0.16 at 6 |
+| Parakeet, time to transcribe one utterance at 6 threads | median 0.42 s, 95th percentile 1.09 s, longest 1.64 s (an 11.8 s utterance) |
+| Parakeet, model load and peak memory of the bench | 3.1 s (kept loaded between meetings); 1,016 MB |
+| Silero VAD | 3.5 s for 444 s of audio |
 | Whisper large-v3-turbo, real-time factor at 6 threads | 2.12: slower than speech. Median 5.9 s an utterance. Not usable live on this CPU |
 | Segment on screen after the speech ends, real app, 2.7-minute meeting, one source | median 1.17 s, 95th percentile 2.11 s, worst 4.72 s (the first utterance, which waited for the model to load) |
+| **60-minute soak** (`scripts/soak.ps1 -Minutes 60 -Loopback`: both sources fed speech without a break) | 3,600.4 s on the meeting clock, 1,832 segments, 15,332 words; the transcript never more than a few seconds behind the clock; 361 ten-second files per source, 220 MB of audio |
+| Soak, memory of the process | 1,316 MB private at minute 5, 1,323 MB at minute 60: 7 MB of growth (working set 1,004–1,113 MB throughout) |
+| Soak, segment after the speech ends | median 1.31 s, 95th percentile 2.68 s, worst 9.0 s. Two sources were being recognised at once for the whole hour, and for the first 25 minutes the PC was also compiling and running the test suites |
+| Real microphone and loopback, 91 s (`soak.exe --devices`, test speech through the speakers) | 22 segments; median 1.16 s, 95th percentile 1.80 s, worst 1.85 s |
 | Seek: click to playhead | 14–61 ms |
 | Recovery of a 71 s meeting | under 5 s, most of it loading the model |
 
-The latency is the cutter's 0.7 s of closing silence plus the recognition. The gate's "≤ 2 s" holds at the median with room to spare and is broken by long utterances: a 10 s utterance takes about 1.9 s to recognise on this CPU, so it lands near 2.6 s. The ways to shorten that are a lower cut-off than 10 s, or a GPU build of sherpa-onnx.
+The latency is the cutter's 0.7 s of closing silence plus the recognition. The gate's "≤ 2 s" holds at the median in every run and is broken at the tail: a 10 s utterance takes 1.6 to 1.9 s to recognise on this CPU, so it lands at 2.3 to 2.6 s, and with two sources talking at once a line can wait for the other source's recognition to finish. The ways to shorten that are a lower cut-off than 10 s, or a GPU build of sherpa-onnx.
 
 ### Not verified
 - **A real room.** Nothing here has heard a person. Accuracy on real voices, accents and Singlish, crosstalk, a noisy room, a far microphone: all unknown.
-- **Echo cancellation.** Loopback capture works, and system audio is transcribed as its own source. Whether the microphone's copy of the speakers is cancelled well enough to avoid doubled text (TEST_PLAN §4.3) needs speakers and a microphone in the same room, and a person to listen.
+- **Echo cancellation, beyond one short run.** With the test speech playing through this PC's speakers and its real microphone open, loopback was transcribed as `system`, 19 lines, correctly. The microphone heard the speakers too: the first two lines, in the first 10 seconds, were also transcribed as `laptop` (doubled text), and one stray fragment ("Tell it.") came through in the 80 seconds after. So the canceller takes about ten seconds to settle and then holds. TEST_PLAN §4.3 asks for no doubled text; that needs a longer run, a person talking over the speakers, and a decision on whether the start-up leak wants a guard (drop a microphone line that repeats a system line of the same moment).
 - **The no-microphone path on real hardware.** The error is covered by tests with a stand-in source; nobody has unplugged a real microphone, before or during a meeting.
 - **A release build.** Everything ran as `pnpm tauri dev`. The installed app's origin differs, which is why the structurer's requests go through the core; that path was used in dev, not in a built app.
 - **Whisper in a meeting.** It downloads, verifies, loads and transcribes in the bench. It was not run in the app, where it would fall behind.

@@ -28,13 +28,17 @@ if ($Text) { $arguments += "--text" }
 $out = New-TemporaryFile
 $process = Start-Process -FilePath "src-tauri/target/debug/examples/bench_stt.exe" -ArgumentList $arguments `
   -NoNewWindow -PassThru -RedirectStandardOutput $out
-# Keep a handle so the peak is still readable after the process has gone.
-$null = $process.Handle
-$process.WaitForExit()
+# Windows forgets a process's peak once it has gone, so watch it while it runs.
+$peak = 0
+while (-not $process.HasExited) {
+  $process.Refresh()
+  if ($process.WorkingSet64 -gt $peak) { $peak = $process.WorkingSet64 }
+  Start-Sleep -Milliseconds 500
+}
 Get-Content $out
 Remove-Item $out
 
 $cpu = (Get-CimInstance Win32_Processor).Name.Trim()
 ""
-"peak memory  {0:N0} MB" -f ($process.PeakWorkingSet64 / 1MB)
+"peak memory  {0:N0} MB" -f ($peak / 1MB)
 "processor    $cpu"
