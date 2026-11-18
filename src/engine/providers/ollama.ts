@@ -47,7 +47,38 @@ export function isLoopback(url: string): boolean {
 
 const trimSlash = (url: string) => url.replace(/\/+$/, '')
 
-export function createOllamaProvider(config: OllamaConfig): StructurerProvider {
+/**
+ * Carries one `/api/chat` request to Ollama and returns the reply, both as
+ * JSON text. The default fetches from where the code runs; the desktop app
+ * passes one that goes through the Rust core, because Ollama refuses the
+ * installed app's web origin and the webview is given no network access.
+ */
+export type OllamaTransport = (
+  body: string,
+  signal: AbortSignal
+) => Promise<string>
+
+const fetchTransport =
+  (baseUrl: string): OllamaTransport =>
+  async (body, signal) => {
+    const response = await fetch(`${baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal,
+      body,
+    })
+    if (!response.ok) {
+      // Ollama's own error line (model missing, out of memory); never ours.
+      const detail = (await response.text()).slice(0, 200)
+      throw new Error(`Ollama answered ${response.status}: ${detail}`)
+    }
+    return response.text()
+  }
+
+export function createOllamaProvider(
+  config: OllamaConfig,
+  transport?: OllamaTransport
+): StructurerProvider {
   const baseUrl = trimSlash(config.baseUrl ?? OLLAMA_URL)
   const model = config.model ?? OLLAMA_MODEL
   const cards = (config.protocol ?? 'cards') === 'cards'
@@ -59,11 +90,9 @@ export function createOllamaProvider(config: OllamaConfig): StructurerProvider {
     local: isLoopback(baseUrl),
     async structure(input: StructurerInput, signal?: AbortSignal) {
       const timeout = AbortSignal.timeout(TIMEOUT_MS)
-      const response = await fetch(`${baseUrl}/api/chat`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-        body: JSON.stringify({
+      const send = transport ?? fetchTransport(baseUrl)
+      const text = await send(
+        JSON.stringify({
           model,
           stream: false,
           think: config.think ?? false,
@@ -80,14 +109,10 @@ export function createOllamaProvider(config: OllamaConfig): StructurerProvider {
             },
           ],
         }),
-      })
-      if (!response.ok) {
-        // Ollama's own error line (model missing, out of memory); never ours.
-        const detail = (await response.text()).slice(0, 200)
-        throw new Error(`Ollama answered ${response.status}: ${detail}`)
-      }
+        signal ? AbortSignal.any([signal, timeout]) : timeout
+      )
 
-      const body = (await response.json()) as {
+      const body = JSON.parse(text) as {
         message?: { content?: string }
         done_reason?: string
       }

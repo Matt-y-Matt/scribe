@@ -4,10 +4,17 @@
 // Node scripts can import it.
 export const SCREEN_IDS = [
   'home-empty',
+  'home-list',
+  'premeeting',
   'live',
   'live-ghost',
   'live-unplanned',
   'live-zoomed-out',
+  'paused',
+  'nomic-error',
+  'model-missing',
+  'settings-audio',
+  'settings-speech',
 ] as const
 
 export type ScreenId = (typeof SCREEN_IDS)[number]

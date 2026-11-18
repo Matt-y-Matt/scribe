@@ -1,0 +1,284 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { Sheet } from '@/components/Sheet'
+import { Button } from '@/components/ui/button'
+import type { ModelDownload, ModelInfo } from '@/ipc'
+import type { SettingsTab } from '@/lib/app-state'
+import { useBackend } from '@/lib/backend'
+import { usePrefs } from '@/lib/prefs'
+import { cn } from '@/lib/utils'
+
+// Settings, UI_SPEC §3.5, with the two tabs M2 needs: Audio and Speech. The
+// other tabs (AI, Scribe, Sending, Privacy, About) arrive with what they set.
+
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'audio', label: 'Audio' },
+  { id: 'speech', label: 'Speech' },
+]
+
+const megabytes = (bytes: number) => `${Math.round(bytes / 1_000_000)} MB`
+
+function Audio() {
+  const backend = useBackend()
+  const microphone = usePrefs(prefs => prefs.microphone)
+  const loopback = usePrefs(prefs => prefs.loopback)
+  const change = usePrefs(prefs => prefs.change)
+  const devices = useQuery({
+    queryKey: ['devices'],
+    queryFn: () => backend.listDevices(),
+    staleTime: 0,
+  })
+
+  if (devices.isPending) {
+    return <p className="text-body text-text-muted">Looking for microphones…</p>
+  }
+  if (devices.isError) {
+    return (
+      <p role="alert" className="text-body">
+        The audio devices could not be listed.
+      </p>
+    )
+  }
+  const { microphones, default_microphone } = devices.data
+  // A saved microphone that is unplugged falls back to the default.
+  const chosen =
+    microphone !== null && microphones.includes(microphone) ? microphone : ''
+
+  return (
+    <div className="flex flex-col gap-4">
+      <label className="flex flex-col gap-1">
+        <span className="text-secondary font-semibold">Microphone</span>
+        {microphones.length === 0 ? (
+          <span role="alert" className="text-body">
+            No microphone found. Plug one in and open this tab again.
+          </span>
+        ) : (
+          <select
+            value={chosen}
+            onChange={event =>
+              change({ microphone: event.target.value || null })
+            }
+            className="h-7 rounded-md border bg-surface px-2 text-body outline-none focus:border-accent"
+          >
+            <option value="">
+              Default{default_microphone ? ` (${default_microphone})` : ''}
+            </option>
+            {microphones.map(name => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+      </label>
+
+      <label className="flex items-start gap-2">
+        <input
+          type="checkbox"
+          checked={loopback}
+          onChange={event => change({ loopback: event.target.checked })}
+          className="mt-0.5 size-3.5 accent-accent"
+        />
+        <span>
+          <span className="block text-body">
+            Also record what this PC plays
+          </span>
+          <span className="block text-meta text-text-muted">
+            For online calls: the other side is transcribed as “System audio”,
+            and its echo is taken out of the microphone.
+          </span>
+        </span>
+      </label>
+      <p className="text-meta text-text-muted">
+        Changes apply to the next meeting you start.
+      </p>
+    </div>
+  )
+}
+
+function ModelRow({
+  model,
+  download,
+  selected,
+  onSelect,
+}: {
+  model: ModelInfo
+  download: ModelDownload | undefined
+  selected: boolean
+  onSelect: () => void
+}) {
+  const backend = useBackend()
+  const running = (download && !download.done) || model.downloading
+  const share =
+    download && download.total > 0 ? download.bytes / download.total : 0
+
+  return (
+    <li className="flex flex-col gap-2 rounded-md border p-3">
+      <div className="flex items-start gap-3">
+        <input
+          type="radio"
+          name="speech-model"
+          aria-label={`Use ${model.title}`}
+          checked={selected}
+          disabled={!model.installed}
+          onChange={onSelect}
+          className="mt-1 size-3.5 accent-accent"
+        />
+        <div className="min-w-0 flex-1">
+          <h3 className="text-body font-semibold">{model.title}</h3>
+          <p className="text-secondary text-text-muted">{model.languages}</p>
+          <p className="font-mono text-meta text-text-muted">
+            {megabytes(model.bytes)} · {model.licence}
+          </p>
+        </div>
+        {model.installed ? (
+          <span className="text-secondary text-text-muted">Installed</span>
+        ) : running ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void backend.cancelDownload(model.id)}
+          >
+            Cancel
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void backend.downloadModel(model.id)}
+          >
+            {download?.error ? 'Try again' : 'Download'}
+          </Button>
+        )}
+      </div>
+      {running && (
+        <div className="flex items-center gap-2">
+          <div
+            role="progressbar"
+            aria-label={`Downloading ${model.title}`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(share * 100)}
+            className="h-1 flex-1 overflow-hidden rounded-full bg-surface-2"
+          >
+            <div
+              className="h-full bg-accent"
+              style={{ width: `${share * 100}%` }}
+            />
+          </div>
+          <span className="font-mono text-meta text-text-muted">
+            {megabytes(download?.bytes ?? 0)} / {megabytes(model.bytes)}
+          </span>
+        </div>
+      )}
+      {!running && download?.error && (
+        <p role="alert" className="text-secondary">
+          The download stopped. What arrived is kept; Try again carries on from
+          there.
+        </p>
+      )}
+    </li>
+  )
+}
+
+function Speech() {
+  const backend = useBackend()
+  const queryClient = useQueryClient()
+  const modelId = usePrefs(prefs => prefs.modelId)
+  const change = usePrefs(prefs => prefs.change)
+  const models = useQuery({
+    queryKey: ['models'],
+    queryFn: () => backend.listModels(),
+    staleTime: 0,
+  })
+  const [downloads, setDownloads] = useState<Record<string, ModelDownload>>({})
+
+  useEffect(
+    () =>
+      backend.onModelDownload(event => {
+        setDownloads(known => ({ ...known, [event.model_id]: event }))
+        // Installed, cancelled or failed: ask what is on disk now.
+        if (event.done) {
+          void queryClient.invalidateQueries({ queryKey: ['models'] })
+        }
+      }),
+    [backend, queryClient]
+  )
+
+  if (models.isPending) {
+    return <p className="text-body text-text-muted">Looking for models…</p>
+  }
+  if (models.isError) {
+    return (
+      <p role="alert" className="text-body">
+        The speech models could not be listed.
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-body">
+        Speech is transcribed on this PC. A model is downloaded once from
+        Hugging Face and checked before it is used.
+      </p>
+      <ul className="flex flex-col gap-2">
+        {models.data.map(model => (
+          <ModelRow
+            key={model.id}
+            model={model}
+            download={downloads[model.id]}
+            selected={model.id === modelId}
+            onSelect={() => change({ modelId: model.id })}
+          />
+        ))}
+      </ul>
+      {models.data.every(model => !model.installed) && (
+        <p role="status" className="text-secondary text-text-muted">
+          Without a model a meeting is still recorded, with no transcript.
+        </p>
+      )}
+    </div>
+  )
+}
+
+export function Settings({
+  tab,
+  onTab,
+  onClose,
+}: {
+  tab: SettingsTab
+  onTab: (tab: SettingsTab) => void
+  onClose: () => void
+}) {
+  return (
+    <Sheet title="Settings" onClose={onClose}>
+      <div
+        role="tablist"
+        aria-label="Settings"
+        className="flex gap-1 border-b px-3 pt-2"
+      >
+        {TABS.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            className={cn(
+              '-mb-px h-8 border-b-2 px-2 text-body',
+              tab === id
+                ? 'border-accent font-semibold'
+                : 'border-transparent text-text-muted'
+            )}
+            onClick={() => onTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" className="p-4">
+        {tab === 'audio' ? <Audio /> : <Speech />}
+      </div>
+    </Sheet>
+  )
+}

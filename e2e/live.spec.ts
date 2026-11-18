@@ -46,6 +46,10 @@ async function open(page: Page, screen: string) {
       errors.push(error.message)
     }
   })
+  // These tests are about the map. They were written when the map had the
+  // whole 800 px of the minimum window; the status strip and the timeline
+  // now take 168 px of it, so the window is that much taller here.
+  await page.setViewportSize({ width: 1280, height: 968 })
   await page.goto(`/?screen=${screen}`)
   await expect(topic(page, 'Pricing')).toBeVisible()
   await page.waitForFunction(() => window.__scribe !== undefined)

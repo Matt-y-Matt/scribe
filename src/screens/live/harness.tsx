@@ -7,6 +7,13 @@ import {
   useMapState,
   type LiveContextValue,
 } from './live-context'
+import {
+  createSessionStore,
+  emptySession,
+  idleActions,
+  type SessionActions,
+  type SessionStore,
+} from './session'
 
 /**
  * The live screen's context without the canvas, for component tests: the
@@ -16,15 +23,24 @@ export function LiveHarness({
   store,
   collapsed = false,
   onNotify,
+  session,
+  actions,
+  onFocusHeader,
   children,
 }: {
   store: MapStore
   collapsed?: boolean
   onNotify?: (message: string) => void
+  session?: SessionStore
+  actions?: Partial<SessionActions>
+  onFocusHeader?: (headerId: string) => void
   children: ReactNode
 }) {
   const state = useMapState(store)
   const [chosen, setActiveTopicId] = useState<string | null>(null)
+  const [ownSession] = useState(() =>
+    createSessionStore(emptySession(state.meeting.id, state.meeting.title))
+  )
   const live: LiveContextValue = {
     store,
     state,
@@ -33,6 +49,9 @@ export function LiveHarness({
     collapsed,
     tidy: () => undefined,
     notify: message => onNotify?.(message),
+    session: session ?? ownSession,
+    actions: { ...idleActions, ...actions },
+    focusHeader: headerId => onFocusHeader?.(headerId),
   }
   return (
     <LiveContext value={live}>

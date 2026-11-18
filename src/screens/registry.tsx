@@ -1,17 +1,33 @@
 import type { ComponentType } from 'react'
-import { Home } from './home/Home'
+import {
+  HomeEmpty,
+  HomeList,
+  PreMeetingSheet,
+  SettingsAudio,
+  SettingsSpeech,
+} from './home/HomeFixtures'
 import {
   Live,
   LiveGhost,
   LiveUnplanned,
   LiveZoomedOut,
+  ModelMissing,
+  NoMicError,
+  Paused,
 } from './live/LiveFixtures'
 import type { ScreenId } from './screens'
 
 export const SCREENS: Record<ScreenId, ComponentType> = {
-  'home-empty': Home,
+  'home-empty': HomeEmpty,
+  'home-list': HomeList,
+  premeeting: PreMeetingSheet,
   live: Live,
   'live-ghost': LiveGhost,
   'live-unplanned': LiveUnplanned,
   'live-zoomed-out': LiveZoomedOut,
+  paused: Paused,
+  'nomic-error': NoMicError,
+  'model-missing': ModelMissing,
+  'settings-audio': SettingsAudio,
+  'settings-speech': SettingsSpeech,
 }

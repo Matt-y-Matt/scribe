@@ -238,6 +238,11 @@ export interface NewCard {
   owner?: string | null
   due_text?: string | null
   segment_ids?: readonly string[]
+  /**
+   * Where in the meeting the card points: a quote made from a highlight
+   * links to the highlight, not to the moment it was marked. Default: now.
+   */
+  t_ms?: number
 }
 
 /** A card someone adds by hand. It needs no segment: a person vouches for it. */
@@ -261,7 +266,7 @@ export function addCard(
     segment_ids: card.segment_ids ?? [],
     status: 'accepted',
     source,
-    created_t_ms: store.now,
+    created_t_ms: card.t_ms ?? store.now,
     confirmed: false,
     order_key: nextOrder(cardsIn(state, topic.id)),
   }

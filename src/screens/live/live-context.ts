@@ -1,6 +1,7 @@
 import { createContext, use, useSyncExternalStore } from 'react'
 import type { MapState } from '@/engine/model'
 import type { MapStore } from '@/engine/store'
+import type { SessionActions, SessionStore } from './session'
 
 /** What every part of the live screen shares. */
 export interface LiveContextValue {
@@ -15,6 +16,11 @@ export interface LiveContextValue {
   tidy: () => void
   /** A line in the bottom-left corner for four seconds, with an Undo. */
   notify: (message: string) => void
+  /** Recording state, transcript, levels, waveform, playback. */
+  session: SessionStore
+  actions: SessionActions
+  /** Brings a header's column into view on the map, at the host's request. */
+  focusHeader: (headerId: string) => void
 }
 
 export const LiveContext = createContext<LiveContextValue | null>(null)

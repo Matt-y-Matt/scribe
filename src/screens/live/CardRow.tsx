@@ -1,9 +1,11 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { useStore } from 'zustand'
 import type { Card } from '@/engine/model'
 import { cn } from '@/lib/utils'
 import { clock, initials } from './format'
 import { KindIcon } from './KindIcon'
 import { KIND_BAR } from './kinds'
+import { useLive } from './live-context'
 
 /** What a card or a topic tells the drag handler when something lands on it. */
 export type DropTarget =
@@ -51,9 +53,30 @@ export function CardFace({ card }: { card: Card }) {
 /**
  * One card: a row inside its topic. Drag it by pointer to another topic, or
  * onto a card to go in front of it. `nodrag` keeps React Flow from dragging
- * the topic instead.
+ * the topic instead. A click plays what the card was made from, and the card
+ * is outlined while that plays (UI_SPEC §2.5).
  */
+/** A card with nothing cited still plays a little from where it points. */
+const UNCITED_MS = 8_000
+
 export function CardRow({ card }: { card: Card }) {
+  const { session, actions } = useLive()
+  // The span the card was made from: its first cited segment to its last.
+  const endMs = useStore(session, state => {
+    let end = 0
+    for (const segment of state.segments) {
+      if (card.segment_ids.includes(segment.id))
+        end = Math.max(end, segment.t1_ms)
+    }
+    return end > card.created_t_ms ? end : card.created_t_ms + UNCITED_MS
+  })
+  const playing = useStore(
+    session,
+    state =>
+      state.playback.playing &&
+      state.playback.tMs >= card.created_t_ms &&
+      state.playback.tMs < endMs
+  )
   const drag = useDraggable({ id: card.id })
   const target: DropTarget = {
     type: 'card',
@@ -77,10 +100,12 @@ export function CardRow({ card }: { card: Card }) {
       className={cn(
         'nodrag nopan fade-in relative flex cursor-grab items-start gap-2 border-b border-l-[3px] py-1 pr-2 pl-[5px] last:border-b-0',
         KIND_BAR[card.kind],
-        drag.isDragging && 'opacity-40'
+        drag.isDragging && 'opacity-40',
+        playing && 'outline outline-1 -outline-offset-1 outline-accent'
       )}
       {...attributes}
       {...drag.listeners}
+      onClick={() => actions.playSpan(card.created_t_ms, endMs)}
     >
       {insertHere && (
         <span

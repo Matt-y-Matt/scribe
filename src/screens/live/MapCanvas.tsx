@@ -64,9 +64,17 @@ export interface MapCanvasProps {
   dispatch: ActionDispatch<[action: CanvasAction]>
   initialViewport: Viewport
   onZoom: (zoom: number) => void
+  /** The header the host asked to see, and a count that changes per ask. */
+  focus: { headerId: string; ask: number } | null
 }
 
-function Flow({ canvas, dispatch, initialViewport, onZoom }: MapCanvasProps) {
+function Flow({
+  canvas,
+  dispatch,
+  initialViewport,
+  onZoom,
+  focus,
+}: MapCanvasProps) {
   const { store, state, tidy, activeTopicId } = useLive()
   const flow = useReactFlow<MapNode>()
   const wrapper = useRef<HTMLDivElement>(null)
@@ -118,6 +126,19 @@ function Flow({ canvas, dispatch, initialViewport, onZoom }: MapCanvasProps) {
       )
     })
   }, [store, flow])
+
+  // An agenda chip was clicked: put that column at the left edge. The host
+  // asked, so this is not the map moving by itself (rule 4.2).
+  useEffect(() => {
+    if (!focus) return
+    const node = flow.getInternalNode(focus.headerId)
+    if (!node) return
+    const { y, zoom } = flow.getViewport()
+    void flow.setViewport(
+      { x: 16 - node.internals.positionAbsolute.x * zoom, y, zoom },
+      { duration: 0 }
+    )
+  }, [focus, flow])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
