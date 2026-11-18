@@ -1,0 +1,26 @@
+[package]
+name = "resampler"
+version = "0.0.1"
+edition = "2024"
+
+[features]
+default = ["async-source"]
+async-source = [
+  "dep:dasp",
+  "dep:futures-util",
+  "dep:anlg-audio-interface",
+  "dep:pin-project",
+]
+
+[dependencies]
+anlg-audio-interface = { path = "../audio-interface", package = "audio-interface", optional = true }
+audioadapter-buffers = "2.0"
+dasp = { version = "0.11.0", features = ["interpolate", "interpolate-linear"], optional = true }
+futures-util = { version = "0.3.31", optional = true }
+pin-project = { version = "1", optional = true }
+rubato = "1.0.1"
+thiserror = "2"
+
+# Scribe: upstream warnings are upstream's to fix (see ../VENDORED.md).
+[lints.rust]
+warnings = "allow"

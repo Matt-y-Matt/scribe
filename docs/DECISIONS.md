@@ -2,8 +2,11 @@
 
 One line per decision, newest first. Format: `YYYY-MM-DD — decision — why — who`.
 
+- 2026-11-19 — The half-day spike of the M2 plan passed on the reference PC: the vendored crates build with rustc 1.100, the microphone and WASAPI loopback both deliver audio, Silero runs, and `ort`'s ONNX Runtime and sherpa-onnx's link statically into one program. Anarlog's capture stays; Meetily's path is not needed — `src-tauri/examples/capture_probe.rs` is the proof and stays as a diagnostic — Claude
+- 2026-11-19 — `rodio` is built without its default features and `ort` without `copy-dylibs` in the vendored manifests — rodio's defaults bring Symphonia (MPL-2.0); `ort`'s DLL copy step panics under Cargo 1.100's build-folder layout during `cargo clippy`, and the models run on the CPU, where Windows' own `DirectML.dll` is enough to load — Claude
+- 2026-11-19 — Test speech is made on the PC by `scripts/make_test_audio.ps1`: Windows' built-in voices read a transcript fixture into `.test-audio/` (git-ignored) — capture, transcription, the soak and recovery can then be run without a room; it proves nothing about real voices or accents — Claude
 - 2026-11-19 — Speech runs on the official `sherpa-onnx` crate (k2-fsa, Apache-2.0), not `sherpa-rs` — `sherpa-rs` was archived on 2026-03-08 and its README sends users to the official bindings; the engine is the same, and M3's wake word and Kokoro are in the official crate — Matt, on Claude's recommendation
-- 2026-11-19 — Anarlog is vendored as 11 crates at commit `9c1cbe2`, not 3: `audio-actual`, `aec`, `vad` and the eight internal crates they need (`audio`, `audio-device`, `audio-interface`, `audio-sync`, `audio-utils`, `audio-mime`, `resampler`, `onnx`). `audio-utils` is cut to the three functions `audio-actual` uses; every change to the copy is listed in `crates/vendor/anarlog/VENDORED.md` — the three crates do not build alone; whole, `audio-utils` brings Symphonia (MPL-2.0) and a Vorbis C build for code we never call — Matt, on Claude's recommendation
+- 2026-11-19 — Anarlog is vendored as 10 crates at commit `9c1cbe2`, not 3: `audio-actual`, `aec`, `vad` and the seven internal crates they need (`audio`, `audio-device`, `audio-interface`, `audio-sync`, `audio-utils`, `resampler`, `onnx`). `audio-utils` is cut to the three functions `audio-actual` uses, which also makes an eleventh crate, `audio-mime`, unnecessary; every change to the copy is listed in `crates/vendor/anarlog/VENDORED.md` — the three crates do not build alone; whole, `audio-utils` brings Symphonia (MPL-2.0) and a Vorbis C build for code we never call — Matt, on Claude's recommendation
 - 2026-11-19 — M2 builds the smallest Pre-meeting sheet, Settings (Audio and Speech tabs) and Home list, and feeds live segments to the structurer on local Ollama (L3) — TEST_PLAN §4 starts in those screens, and saved topics and cards cannot be shown without a live map — Matt, on Claude's recommendation
 - 2026-11-19 — The transcript panel is a tab in the right column under the Pins rail; the scribe panel becomes the second tab in M3 (L2) — UI_SPEC §2 has no place for it and that slot is empty until M3 — Matt, on Claude's recommendation
 - 2026-11-19 — Pause is a 300 ms hold on the indicator while live; resume is one click (L4) — UI_SPEC §2.1 as written; a stray click must not stop a recording — Matt
@@ -81,9 +84,14 @@ Licence as declared in the npm or crates.io registry on the day the dependency w
 | Dev only: typescript, @playwright/test | Apache-2.0 | M0 |
 | Dev only: tsx, vitest, jsdom, @testing-library/react, @testing-library/jest-dom, eslint, @eslint/js, typescript-eslint, eslint-plugin-react, eslint-plugin-react-hooks, eslint-plugin-react-compiler, eslint-plugin-react-refresh, eslint-config-prettier, prettier, @types/node, @types/react, @types/react-dom | MIT | M0 |
 | lucide-react (card-kind and control icons) | ISC | M1 |
-| sherpa-rs (bindings) / sherpa-onnx | MIT / Apache-2.0 | M2 |
-| Anarlog crates audio-actual, aec, vad (vendored, commit: ___) | MIT | M2 |
+| sherpa-onnx (official bindings; they download and link the sherpa-onnx libraries, which contain ONNX Runtime, MIT) | Apache-2.0 | M2 |
+| Anarlog crates `audio-actual`, `aec`, `vad`, `audio`, `audio-device`, `audio-interface`, `audio-sync`, `audio-utils`, `resampler`, `onnx` (vendored at `9c1cbe2`; notice in `crates/vendor/anarlog/LICENSE`), with the Silero VAD v6.2 model and the two echo-cancellation models they embed | MIT | M2 |
+| Dependencies of the vendored crates: ort (downloads ONNX Runtime, MIT), ndarray, rodio, dasp, ringbuf, anyhow, pin-project, windows, windows-core | MIT OR Apache-2.0 | M2 |
+| Dependencies of the vendored crates: wasapi, rubato, realfft, ebur128, audioadapter-buffers, tokio-stream, tracing | MIT | M2 |
+| Dependency of the vendored crates: cpal | Apache-2.0 | M2 |
 | hound | Apache-2.0 | M2 |
+| tokio, tokio-util | MIT | M2 |
+| futures-util, thiserror, reqwest, sha2 | MIT OR Apache-2.0 | M2 |
 | livekit (Rust SDK), livekit-client (JS) | Apache-2.0 | M4 |
 | rust-dominant-speaker | MIT/Apache-2.0 | M4 |
 | lettre, icalendar | MIT/Apache-2.0 | M5 |

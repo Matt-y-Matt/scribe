@@ -1,0 +1,17 @@
+[package]
+name = "vad"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+earshot = ["dep:earshot"]
+silero-onnx = ["dep:anlg-onnx"]
+
+[dependencies]
+anlg-onnx = { path = "../onnx", package = "onnx", optional = true }
+earshot = { version = "0.1.0", optional = true }
+thiserror = "2"
+
+# Scribe: upstream warnings are upstream's to fix (see ../VENDORED.md).
+[lints.rust]
+warnings = "allow"

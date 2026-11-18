@@ -2,6 +2,7 @@
 //! (docs/BUILD_PLAN.md): `audio`, `stt`, `session`, `store` in M2, `scribe`
 //! in M3, `phones` in M4, `dispatch` in M5.
 
+pub mod audio;
 mod ipc;
 
 use tauri::Manager;

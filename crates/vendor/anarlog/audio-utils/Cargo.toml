@@ -1,0 +1,13 @@
+[package]
+name = "audio-utils"
+version = "0.1.0"
+edition = "2024"
+
+# Trimmed for Scribe: only `pcm` and `playback` are kept (see ../VENDORED.md).
+[dependencies]
+rodio = { version = "0.22", default-features = false, features = ["playback", "hound", "tracing"] }
+tracing = "0.1"
+
+# Scribe: upstream warnings are upstream's to fix (see ../VENDORED.md).
+[lints.rust]
+warnings = "allow"

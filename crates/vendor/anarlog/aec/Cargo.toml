@@ -1,0 +1,22 @@
+[package]
+name = "aec"
+version = "0.1.0"
+edition = "2024"
+
+# Only the 128 model pair is vendored (see ../VENDORED.md).
+[features]
+default = ["onnx", "128"]
+onnx = ["dep:anlg-onnx"]
+128 = []
+
+[dependencies]
+anlg-onnx = { path = "../onnx", package = "onnx", optional = true }
+
+realfft = "3.5.0"
+
+serde = "1"
+thiserror = "2"
+
+# Scribe: upstream warnings are upstream's to fix (see ../VENDORED.md).
+[lints.rust]
+warnings = "allow"

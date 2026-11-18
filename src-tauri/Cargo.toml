@@ -29,6 +29,22 @@ tauri-plugin-store = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-global-shortcut = "2"
 
+# Capture, echo cancellation and VAD: Anarlog's crates, vendored by commit
+# (crates/vendor/anarlog/VENDORED.md). Do not rewrite capture.
+audio-actual = { path = "../crates/vendor/anarlog/audio-actual" }
+anlg-audio = { path = "../crates/vendor/anarlog/audio", package = "audio" }
+vad = { path = "../crates/vendor/anarlog/vad", features = ["silero-onnx"] }
+# Speech to text: the official sherpa-onnx bindings (DECISIONS 2026-11-19).
+sherpa-onnx = "2.0.1"
+hound = "3.5"
+ndarray = "0.16"
+thiserror = "2"
+reqwest = { version = "0.13", default-features = false, features = ["native-tls", "stream"] }
+sha2 = "0.10"
+tokio-util = "0.7"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "fs", "io-util", "net"] }
+futures-util = "0.3"
+
 # Typed Rust <-> TS boundary (src/ipc.rs -> ../src/ipc.ts)
 specta = { version = "=2.0.0-rc.22", features = ["derive"] }
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }

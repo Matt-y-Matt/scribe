@@ -1,0 +1,35 @@
+[package]
+name = "audio-actual"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anlg-aec = { path = "../aec", package = "aec" }
+anlg-audio = { path = "../audio", package = "audio" }
+anlg-audio-device = { path = "../audio-device", package = "audio-device" }
+anlg-audio-interface = { path = "../audio-interface", package = "audio-interface" }
+anlg-audio-sync = { path = "../audio-sync", package = "audio-sync" }
+anlg-audio-utils = { path = "../audio-utils", package = "audio-utils" }
+anlg-resampler = { path = "../resampler", package = "resampler" }
+
+anyhow = "1"
+futures-util = "0.3.31"
+pin-project = "1"
+tokio = { version = "1", features = ["rt", "macros", "sync", "time"] }
+tokio-stream = "0.1.17"
+tokio-util = "0.7.15"
+tracing = "0.1"
+
+cpal = "0.17"
+dasp = { version = "0.11.0", features = ["interpolate", "interpolate-linear"] }
+rodio = { version = "0.22", default-features = false, features = ["playback", "hound", "tracing"] }
+
+ebur128 = "0.1.10"
+ringbuf = "0.4.8"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+wasapi = "0.23.0"
+
+# Scribe: upstream warnings are upstream's to fix (see ../VENDORED.md).
+[lints.rust]
+warnings = "allow"

@@ -13,3 +13,6 @@ playwright-report/
 .vscode/*
 .idea
 .DS_Store
+
+# Synthetic speech made by scripts/make_test_audio.ps1
+.test-audio/

@@ -1,0 +1,17 @@
+[package]
+name = "audio-interface"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["rodio"]
+rodio = ["dep:dasp", "dep:rodio"]
+
+[dependencies]
+dasp = { version = "0.11.0", features = ["interpolate", "interpolate-linear"], optional = true }
+futures-util = "0.3.31"
+rodio = { version = "0.22", default-features = false, features = ["playback", "hound", "tracing"], optional = true }
+
+# Scribe: upstream warnings are upstream's to fix (see ../VENDORED.md).
+[lints.rust]
+warnings = "allow"

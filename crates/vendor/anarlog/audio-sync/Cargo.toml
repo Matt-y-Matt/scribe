@@ -1,0 +1,11 @@
+[package]
+name = "audio-sync"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+realfft = "3.5.0"
+
+# Scribe: upstream warnings are upstream's to fix (see ../VENDORED.md).
+[lints.rust]
+warnings = "allow"
