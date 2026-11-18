@@ -2,6 +2,7 @@ import type { ComponentType } from 'react'
 import {
   HomeEmpty,
   HomeList,
+  HomeSearch,
   PreMeetingSheet,
   SettingsAudio,
   SettingsSpeech,
@@ -20,6 +21,7 @@ import type { ScreenId } from './screens'
 export const SCREENS: Record<ScreenId, ComponentType> = {
   'home-empty': HomeEmpty,
   'home-list': HomeList,
+  'home-search': HomeSearch,
   premeeting: PreMeetingSheet,
   live: Live,
   'live-ghost': LiveGhost,

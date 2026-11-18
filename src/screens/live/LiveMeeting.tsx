@@ -11,10 +11,13 @@ import { openMeeting, type RunningMeeting } from './meeting-controller'
 export function LiveMeeting({
   meetingId,
   start,
+  atMs,
 }: {
   meetingId: string
   /** Start recording at once: the host came from Start recording. */
   start: boolean
+  /** Play the recording from this moment once the meeting is open. */
+  atMs?: number
 }) {
   const backend = useBackend()
   const { sheet, open: openSheet, close, go } = useApp()
@@ -36,6 +39,10 @@ export function LiveMeeting({
         else {
           opened = next
           setRunning(next)
+          // A finished meeting opened at a moment plays from that moment.
+          if (atMs !== undefined && next.session.getState().review) {
+            next.actions.seekPlay(atMs)
+          }
         }
       },
       (error: unknown) => {
@@ -49,7 +56,7 @@ export function LiveMeeting({
       gone = true
       opened?.dispose()
     }
-  }, [backend, meetingId, start])
+  }, [backend, meetingId, start, atMs])
 
   if (failed) {
     return (

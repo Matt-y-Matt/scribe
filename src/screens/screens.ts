@@ -5,6 +5,7 @@
 export const SCREEN_IDS = [
   'home-empty',
   'home-list',
+  'home-search',
   'premeeting',
   'live',
   'live-ghost',

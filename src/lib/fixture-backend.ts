@@ -1,6 +1,7 @@
 import type {
   Devices,
   Highlight,
+  MapRows,
   MeetingInfo,
   ModelDownload,
   ModelInfo,
@@ -44,6 +45,8 @@ export interface FixtureData {
   models: ModelInfo[]
   devices: Devices
   segments: Record<string, SegmentFinal[]>
+  /** The saved map of a meeting, by meeting id. */
+  maps: Record<string, MapRows>
   highlights: Record<string, Highlight[]>
   /** A download in progress, replayed to every listener. */
   download: ModelDownload | null
@@ -64,6 +67,7 @@ export function fixtureBackend(overrides: Partial<FixtureData> = {}): Backend {
     models: FIXTURE_MODELS,
     devices: FIXTURE_DEVICES,
     segments: {},
+    maps: {},
     highlights: {},
     download: null,
     ...overrides,
@@ -160,7 +164,8 @@ export function fixtureBackend(overrides: Partial<FixtureData> = {}): Backend {
       )
     },
 
-    mapLoad: async () => ({ topics: [], cards: [], suggestions: [] }),
+    mapLoad: async meetingId =>
+      data.maps[meetingId] ?? { topics: [], cards: [], suggestions: [] },
     mapSave: async () => undefined,
     ollamaChat: async () => {
       throw new BackendError({ kind: 'local_ai', detail: 'no core' })

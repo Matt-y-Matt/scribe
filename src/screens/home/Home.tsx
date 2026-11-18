@@ -1,18 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Settings as SettingsIcon, TriangleAlert } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { Search, Settings as SettingsIcon, TriangleAlert } from 'lucide-react'
+import { useDeferredValue, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
-import type { MeetingInfo, NewMeeting } from '@/ipc'
+import type { MeetingInfo, NewMeeting, SegmentFinal } from '@/ipc'
 import { useApp } from '@/lib/app-state'
 import { useBackend } from '@/lib/backend'
 import { usePrefs } from '@/lib/prefs'
+import { cn } from '@/lib/utils'
 import { clock } from '../live/format'
 import { Settings } from '../settings/Settings'
+import { MeetingPreview } from './MeetingPreview'
+import { matchesMeeting } from './outline'
 import { PreMeeting } from './PreMeeting'
 
-// Home, docs/UI_SPEC.md §3.1. Left: New meeting and the meetings list.
-// Right: the selected meeting's summary preview, which has nothing to show
-// until the end screen writes summaries (M5). Search arrives with it.
+// Home, docs/UI_SPEC.md §3.1. Left: New meeting, the search box and the
+// meetings list. Right: the selected meeting at a glance, what was decided
+// and who owes what, with Open to go into it.
 
 const day = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
@@ -21,6 +24,11 @@ const day = new Intl.DateTimeFormat(undefined, {
   hour: '2-digit',
   minute: '2-digit',
 })
+
+/** A search starts at two letters; one matches nearly everything. */
+const MIN_QUERY = 2
+/** Lines of transcript shown under a meeting that matched. */
+const MAX_LINES = 3
 
 function Notice({ children }: { children: ReactNode }) {
   return (
@@ -33,16 +41,38 @@ function Notice({ children }: { children: ReactNode }) {
   )
 }
 
-function MeetingRow({ meeting }: { meeting: MeetingInfo }) {
+function MeetingRow({
+  meeting,
+  selected,
+  lines,
+  onSelect,
+}: {
+  meeting: MeetingInfo
+  selected: boolean
+  /** Transcript lines that matched the search. */
+  lines: readonly SegmentFinal[]
+  onSelect: () => void
+}) {
   const go = useApp(app => app.go)
   const unfinished =
     meeting.started_at_ms !== null && meeting.ended_at_ms === null
   return (
-    <li>
+    <li
+      className={cn(
+        'rounded-md border',
+        selected ? 'border-accent bg-accent-soft' : 'border-transparent'
+      )}
+    >
       <button
         type="button"
-        className="flex w-full flex-col gap-0.5 rounded-md border border-transparent px-2 py-1.5 text-left transition-opacity duration-150 ease-out hover:bg-surface-2"
-        onClick={() => go({ name: 'meeting', meetingId: meeting.id })}
+        aria-current={selected || undefined}
+        title="Double-click to open"
+        className={cn(
+          'flex w-full flex-col gap-0.5 rounded-md px-2 py-1.5 text-left transition-opacity duration-150 ease-out',
+          !selected && 'hover:bg-surface-2'
+        )}
+        onClick={onSelect}
+        onDoubleClick={() => go({ name: 'meeting', meetingId: meeting.id })}
       >
         <span className="truncate text-body font-semibold">
           {meeting.title}
@@ -57,16 +87,55 @@ function MeetingRow({ meeting }: { meeting: MeetingInfo }) {
           </span>
         )}
       </button>
+      {lines.length > 0 && (
+        <ul aria-label={`Matches in ${meeting.title}`} className="pb-1">
+          {lines.slice(0, MAX_LINES).map(line => (
+            <li key={line.id}>
+              <button
+                type="button"
+                title="Open the meeting and play from here"
+                className="flex w-full gap-2 rounded-md px-2 py-0.5 text-left text-secondary hover:bg-surface-2"
+                onClick={() =>
+                  go({
+                    name: 'meeting',
+                    meetingId: meeting.id,
+                    atMs: line.t0_ms,
+                  })
+                }
+              >
+                <span className="shrink-0 font-mono text-meta text-text-muted">
+                  {clock(line.t0_ms)}
+                </span>
+                <span className="line-clamp-2 min-w-0">{line.text}</span>
+              </button>
+            </li>
+          ))}
+          {lines.length > MAX_LINES && (
+            <li className="px-2 text-meta text-text-muted">
+              and {lines.length - MAX_LINES} more in the transcript
+            </li>
+          )}
+        </ul>
+      )}
     </li>
   )
 }
 
-export function Home() {
+export function Home({
+  initialSearch = '',
+}: {
+  /** What the search box opens with: the `?screen=home-search` fixture. */
+  initialSearch?: string
+}) {
   const backend = useBackend()
   const queryClient = useQueryClient()
   const { sheet, open, close, go } = useApp()
   const modelId = usePrefs(prefs => prefs.modelId)
   const [later, setLater] = useState<string[]>([])
+  const [chosen, setChosen] = useState<string | null>(null)
+  const [typed, setTyped] = useState(initialSearch)
+  const query = useDeferredValue(typed.trim())
+  const searching = query.length >= MIN_QUERY
 
   const meetings = useQuery({
     queryKey: ['meetings'],
@@ -81,6 +150,12 @@ export function Home() {
   const models = useQuery({
     queryKey: ['models'],
     queryFn: () => backend.listModels(),
+    staleTime: 0,
+  })
+  const said = useQuery({
+    queryKey: ['search', query],
+    queryFn: () => backend.searchSegments(null, query),
+    enabled: searching,
     staleTime: 0,
   })
   const recover = useMutation({
@@ -102,6 +177,28 @@ export function Home() {
     meeting => !later.includes(meeting.id)
   )
   const noModel = models.data?.every(model => !model.installed) ?? false
+
+  // What was said, by meeting, in meeting order.
+  const linesBy = new Map<string, SegmentFinal[]>()
+  if (searching) {
+    for (const line of said.data ?? []) {
+      linesBy.set(line.meeting_id, [
+        ...(linesBy.get(line.meeting_id) ?? []),
+        line,
+      ])
+    }
+    for (const lines of linesBy.values()) {
+      lines.sort((a, b) => a.t0_ms - b.t0_ms)
+    }
+  }
+  const all = meetings.data ?? []
+  const shown = searching
+    ? all.filter(
+        meeting => matchesMeeting(meeting, query) || linesBy.has(meeting.id)
+      )
+    : all
+  // The meeting on the right: the one picked, else the first in the list.
+  const selected = shown.find(meeting => meeting.id === chosen) ?? shown[0]
 
   return (
     <main className="relative flex h-full bg-bg">
@@ -125,6 +222,23 @@ export function Home() {
             New meeting
           </Button>
         </div>
+
+        {all.length > 0 && (
+          <label className="flex h-7 items-center gap-2 rounded-md border bg-surface px-2 focus-within:border-accent">
+            <Search size={14} aria-hidden className="text-text-muted" />
+            <input
+              type="search"
+              aria-label="Search meetings"
+              placeholder="Search titles, people and what was said"
+              value={typed}
+              onChange={event => setTyped(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === 'Escape') setTyped('')
+              }}
+              className="min-w-0 flex-1 bg-transparent text-body outline-none placeholder:text-text-muted"
+            />
+          </label>
+        )}
 
         {toRecover.map(meeting => (
           <Notice key={meeting.id}>
@@ -190,22 +304,41 @@ export function Home() {
           <p role="alert" className="text-body">
             The meetings could not be read from this PC.
           </p>
-        ) : meetings.data && meetings.data.length > 0 ? (
+        ) : all.length === 0 ? (
+          <p className="text-body text-text-muted">
+            {meetings.isPending
+              ? ''
+              : 'No meetings yet. Start one and Scribe keeps the notes.'}
+          </p>
+        ) : shown.length === 0 ? (
+          <p role="status" className="text-body text-text-muted">
+            {said.isFetching
+              ? 'Searching…'
+              : `No meeting has “${query}” in its title, people or transcript.`}
+          </p>
+        ) : (
           <ul
             aria-label="Meetings"
-            className="-mx-2 flex min-h-0 flex-col overflow-y-auto"
+            className="-mx-2 flex min-h-0 flex-col gap-0.5 overflow-y-auto px-px"
           >
-            {meetings.data.map(meeting => (
-              <MeetingRow key={meeting.id} meeting={meeting} />
+            {shown.map(meeting => (
+              <MeetingRow
+                key={meeting.id}
+                meeting={meeting}
+                selected={meeting.id === selected?.id}
+                lines={linesBy.get(meeting.id) ?? []}
+                onSelect={() => setChosen(meeting.id)}
+              />
             ))}
           </ul>
-        ) : (
-          <p className="text-body text-text-muted">
-            No meetings yet. Start one and Scribe keeps the notes.
-          </p>
         )}
       </section>
-      <section aria-label="Summary preview" className="min-w-0 flex-1" />
+      <section
+        aria-label="Summary preview"
+        className="min-w-0 flex-1 overflow-y-auto"
+      >
+        {selected && <MeetingPreview key={selected.id} meeting={selected} />}
+      </section>
 
       {sheet?.name === 'premeeting' && (
         <PreMeeting onStart={start} onClose={close} />

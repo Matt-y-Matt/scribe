@@ -29,6 +29,7 @@ function Shell() {
             key={route.meetingId}
             meetingId={route.meetingId}
             start={route.start ?? false}
+            atMs={route.atMs}
           />
         ) : (
           <Home />

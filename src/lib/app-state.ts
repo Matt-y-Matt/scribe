@@ -5,8 +5,12 @@ import { create } from 'zustand'
 
 export type Route =
   | { name: 'home' }
-  /** `start`: the host pressed Start recording to get here. */
-  | { name: 'meeting'; meetingId: string; start?: boolean }
+  /**
+   * `start`: the host pressed Start recording to get here. `atMs`: they
+   * picked a moment of a past meeting (a search hit, a card on Home), and the
+   * recording plays from it.
+   */
+  | { name: 'meeting'; meetingId: string; start?: boolean; atMs?: number }
 
 export type SettingsTab = 'audio' | 'speech'
 

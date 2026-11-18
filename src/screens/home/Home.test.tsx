@@ -63,6 +63,121 @@ describe('Home', () => {
     )
   })
 
+  it('previews the first meeting, and another when it is picked', async () => {
+    render(<HomeList />)
+    const preview = screen.getByRole('region', { name: 'Summary preview' })
+    expect(
+      await within(preview).findByRole('heading', { name: 'Bench 60' })
+    ).toBeVisible()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Custore weekly team meeting/ })
+    )
+    expect(
+      await within(preview).findByRole('heading', {
+        name: 'Custore weekly team meeting',
+      })
+    ).toBeVisible()
+    // What was decided, who owes what, what was parked: from the saved map.
+    const decisions = await within(preview).findByRole('region', {
+      name: 'Decisions',
+    })
+    expect(decisions).toHaveTextContent('DECISIONS (4)')
+    expect(decisions).toHaveTextContent('Quote 42 a set')
+    const actions = within(preview).getByRole('region', { name: 'Actions' })
+    expect(actions).toHaveTextContent('Write the CLA quote')
+    expect(actions).toHaveTextContent('Pricing · Matt')
+    expect(
+      within(preview).getByRole('region', { name: 'Pinned' })
+    ).toHaveTextContent('Office aircon')
+    // Picking a meeting does not leave Home.
+    expect(useApp.getState().route).toEqual({ name: 'home' })
+  })
+
+  it('opens the meeting from Open, and at a moment from a card’s time', async () => {
+    render(<HomeList />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Custore weekly team meeting/ })
+    )
+    const preview = screen.getByRole('region', { name: 'Summary preview' })
+    await within(preview).findByRole('region', { name: 'Decisions' })
+
+    fireEvent.click(within(preview).getByRole('button', { name: '00:00:52' }))
+    expect(useApp.getState().route).toEqual({
+      name: 'meeting',
+      meetingId: 'm_3',
+      atMs: 52_300,
+    })
+
+    fireEvent.click(within(preview).getByRole('button', { name: 'Open' }))
+    expect(useApp.getState().route).toMatchObject({
+      name: 'meeting',
+      meetingId: 'm_3',
+      atMs: undefined,
+    })
+  })
+
+  it('says so when a meeting has no notes', async () => {
+    render(<HomeList />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: /BNI one-to-one/ })
+    )
+    expect(
+      await screen.findByText(/No notes were taken in this meeting/)
+    ).toBeVisible()
+  })
+
+  it('searches titles, people and what was said', async () => {
+    render(<HomeList />)
+    const box = await screen.findByRole('searchbox', {
+      name: 'Search meetings',
+    })
+
+    // A title.
+    fireEvent.change(box, { target: { value: 'udo order' } })
+    const list = () => screen.getByRole('list', { name: 'Meetings' })
+    await waitFor(() =>
+      expect(
+        within(list()).getAllByRole('button', {
+          name: /review|meeting|one|Bench/,
+        })
+      ).toHaveLength(1)
+    )
+    expect(list()).toHaveTextContent('UDO order review')
+
+    // Something said: the meeting it was said in, with the lines.
+    fireEvent.change(box, { target: { value: 'landlord' } })
+    const lines = await screen.findByRole('list', {
+      name: 'Matches in Custore weekly team meeting',
+    })
+    expect(lines).toHaveTextContent('00:03:08')
+    expect(lines).toHaveTextContent('contractor is useless')
+    expect(list()).not.toHaveTextContent('UDO order review')
+
+    // A line opens the meeting at that moment.
+    fireEvent.click(within(lines).getByRole('button', { name: /I'll message/ }))
+    expect(useApp.getState().route).toEqual({
+      name: 'meeting',
+      meetingId: 'm_3',
+      atMs: 377_000,
+    })
+  })
+
+  it('says so when nothing matches, and Escape clears the search', async () => {
+    render(<HomeList />)
+    const box = await screen.findByRole('searchbox', {
+      name: 'Search meetings',
+    })
+    fireEvent.change(box, { target: { value: 'zebra' } })
+    expect(
+      await screen.findByText(
+        'No meeting has “zebra” in its title, people or transcript.'
+      )
+    ).toBeVisible()
+    fireEvent.keyDown(box, { key: 'Escape' })
+    expect(await screen.findByRole('list', { name: 'Meetings' })).toBeVisible()
+  })
+
   it('opens the Pre-meeting sheet from New meeting', async () => {
     render(<HomeEmpty />)
     fireEvent.click(await screen.findByRole('button', { name: 'New meeting' }))

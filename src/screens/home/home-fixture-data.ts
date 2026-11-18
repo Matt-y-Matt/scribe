@@ -1,4 +1,7 @@
-import type { MeetingInfo, NewMeeting } from '@/ipc'
+import { patchOfState } from '@/engine/persist'
+import type { MapRows, MeetingInfo, NewMeeting, SegmentFinal } from '@/ipc'
+import { FIXTURE_PINS, fixtureStore } from '../live/fixture'
+import { fixtureSegments } from '../live/fixture-session'
 
 // The meetings Home lists in its `?screen=` states and tests.
 
@@ -36,6 +39,28 @@ export const FIXTURE_MEETINGS: MeetingInfo[] = [
   meeting('m_2', 'UDO order review', 6, 31, ['Lead times', 'Colours']),
   meeting('m_1', 'BNI one-to-one', 9, 24, []),
 ]
+
+/** The weekly meeting's map and transcript: the golden fixture's. */
+export function fixtureMaps(): Record<string, MapRows> {
+  const { topics, cards, suggestions } = patchOfState(
+    fixtureStore({ pins: FIXTURE_PINS }).getState()
+  )
+  const mine = <T extends { meeting_id: string }>(rows: readonly T[]) =>
+    rows.map(row => ({ ...row, meeting_id: 'm_3' }))
+  return {
+    m_3: {
+      topics: mine(topics),
+      cards: mine(cards),
+      suggestions: mine(suggestions),
+    },
+  }
+}
+
+export function fixtureTranscripts(): Record<string, SegmentFinal[]> {
+  return {
+    m_3: fixtureSegments().map(segment => ({ ...segment, meeting_id: 'm_3' })),
+  }
+}
 
 export const PREMEETING_DRAFT: Partial<NewMeeting> = {
   title: 'Custore weekly team meeting',

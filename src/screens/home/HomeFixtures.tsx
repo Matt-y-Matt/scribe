@@ -9,15 +9,30 @@ import {
 } from '@/lib/fixture-backend'
 import { Settings } from '../settings/Settings'
 import { Home } from './Home'
-import { FIXTURE_MEETINGS, PREMEETING_DRAFT } from './home-fixture-data'
+import {
+  FIXTURE_MEETINGS,
+  fixtureMaps,
+  fixtureTranscripts,
+  PREMEETING_DRAFT,
+} from './home-fixture-data'
 import { PreMeeting } from './PreMeeting'
 
 // Home, the Pre-meeting sheet and Settings as `?screen=` states
 // (docs/TEST_PLAN.md §8), on a core that is not there.
 
-function fixtureHome(data: Partial<FixtureData>, sheet: Sheet = null) {
+function fixtureHome(
+  data: Partial<FixtureData>,
+  sheet: Sheet = null,
+  search = ''
+) {
   return function HomeFixture() {
-    const [backend] = useState(() => fixtureBackend(data))
+    const [backend] = useState(() =>
+      fixtureBackend({
+        maps: fixtureMaps(),
+        segments: fixtureTranscripts(),
+        ...data,
+      })
+    )
     const [client] = useState(
       () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
     )
@@ -32,7 +47,7 @@ function fixtureHome(data: Partial<FixtureData>, sheet: Sheet = null) {
       <QueryClientProvider client={client}>
         <BackendContext value={backend}>
           <div className="relative h-full">
-            <Home />
+            <Home initialSearch={search} />
             {sheet?.name === 'premeeting' && (
               <PreMeeting
                 initial={PREMEETING_DRAFT}
@@ -55,6 +70,13 @@ export const HomeEmpty = fixtureHome({})
 
 /** A few meetings, and one that was being recorded when the app died. */
 export const HomeList = fixtureHome({ meetings: FIXTURE_MEETINGS })
+
+/** A search that matches a title and lines of two transcripts. */
+export const HomeSearch = fixtureHome(
+  { meetings: FIXTURE_MEETINGS },
+  null,
+  'landlord'
+)
 
 /** New meeting pressed: the Pre-meeting sheet, filled in. */
 export const PreMeetingSheet = fixtureHome(
