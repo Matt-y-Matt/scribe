@@ -4,8 +4,9 @@ import { deleteTopic, mergeTopic, pinTopic } from '@/engine/actions'
 import type { Topic } from '@/engine/model'
 import { useLive } from './live-context'
 
-// The "⋯" menu on a topic (UI_SPEC §2.2): rename, pin, merge into…, tidy,
-// delete. Each is one undoable operation; delete says so in a toast.
+// The "⋯" menu on a topic (UI_SPEC §2.2): add a card, rename, pin, merge
+// into…, tidy, delete. Each is one undoable operation; delete says so in a
+// toast.
 
 const popup =
   'min-w-40 rounded-md border bg-surface p-1 text-body text-text outline-none'
@@ -15,9 +16,11 @@ const item =
 export function TopicMenu({
   topic,
   onRename,
+  onAddCard,
 }: {
   topic: Topic
   onRename: () => void
+  onAddCard: () => void
 }) {
   const { store, state, tidy, notify } = useLive()
   const others = Object.values(state.topics)
@@ -40,6 +43,9 @@ export function TopicMenu({
       <Menu.Portal>
         <Menu.Positioner align="end" sideOffset={4} className="z-50">
           <Menu.Popup className={popup}>
+            <Menu.Item className={item} onClick={onAddCard}>
+              Add card
+            </Menu.Item>
             <Menu.Item className={item} onClick={onRename}>
               Rename
             </Menu.Item>

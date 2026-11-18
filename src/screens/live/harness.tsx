@@ -38,6 +38,7 @@ export function LiveHarness({
 }) {
   const state = useMapState(store)
   const [chosen, setActiveTopicId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [ownSession] = useState(() =>
     createSessionStore(emptySession(state.meeting.id, state.meeting.title))
   )
@@ -47,6 +48,8 @@ export function LiveHarness({
     activeTopicId: chosen ?? lastTouchedTopicId(state),
     setActiveTopicId,
     collapsed,
+    editingId,
+    setEditingId,
     tidy: () => undefined,
     notify: message => onNotify?.(message),
     session: session ?? ownSession,

@@ -138,6 +138,7 @@ export function LiveScreen({
   const [canvas, dispatch] = useReducer(canvasReducer, INITIAL_CANVAS)
   const [chosenTopicId, setActiveTopicId] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(zoom < COLLAPSE_ZOOM)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [focus, setFocus] = useState<{ headerId: string; ask: number } | null>(
     null
   )
@@ -163,6 +164,8 @@ export function LiveScreen({
     activeTopicId,
     setActiveTopicId,
     collapsed,
+    editingId,
+    setEditingId,
     tidy: () => dispatch({ type: 'tidy' }),
     notify: message => setToast({ id: Date.now(), message }),
     session,

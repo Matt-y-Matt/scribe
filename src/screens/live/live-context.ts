@@ -14,6 +14,12 @@ export interface LiveContextValue {
   collapsed: boolean
   /** Forgets every hand-placed position and lays the map out afresh. */
   tidy: () => void
+  /**
+   * What is being edited in place: a card's id, or `new:` and a topic's id
+   * for a card being added to it. One at a time.
+   */
+  editingId: string | null
+  setEditingId: (id: string | null) => void
   /** A line in the bottom-left corner for four seconds, with an Undo. */
   notify: (message: string) => void
   /** Recording state, transcript, levels, waveform, playback. */

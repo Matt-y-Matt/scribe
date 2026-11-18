@@ -10,6 +10,7 @@ import {
   type Topic,
 } from '@/engine/model'
 import { cn } from '@/lib/utils'
+import { CardEditor } from './CardEditor'
 import { CardRow, type DropTarget } from './CardRow'
 import { GhostFrame, TopicGhosts } from './Ghosts'
 import { KindIcon } from './KindIcon'
@@ -86,7 +87,14 @@ function PinMarker({ topic }: { topic: Topic }) {
 }
 
 export function TopicCard({ topicId }: { topicId: string }) {
-  const { state, activeTopicId, setActiveTopicId, collapsed } = useLive()
+  const {
+    state,
+    activeTopicId,
+    setActiveTopicId,
+    collapsed,
+    editingId,
+    setEditingId,
+  } = useLive()
   const [renaming, setRenaming] = useState(false)
   const target: DropTarget = { type: 'topic', topicId }
   const { setNodeRef, isOver } = useDroppable({
@@ -103,6 +111,7 @@ export function TopicCard({ topicId }: { topicId: string }) {
     ({ payload }) => payload.kind === 'pin' && payload.topic_id === topic.id
   )
   const active = activeTopicId === topic.id
+  const adding = editingId === `new:${topic.id}`
 
   return (
     <section
@@ -147,17 +156,29 @@ export function TopicCard({ topicId }: { topicId: string }) {
           >
             {cards.length}
           </span>
-          <TopicMenu topic={topic} onRename={() => setRenaming(true)} />
+          <TopicMenu
+            topic={topic}
+            onRename={() => setRenaming(true)}
+            onAddCard={() => setEditingId(`new:${topic.id}`)}
+          />
         </header>
       )}
 
-      {collapsed ? (
+      {collapsed && !adding ? (
         <KindCounts cards={cards} />
       ) : (
         <ul className={cn(pinGhost && 'border-t', 'min-h-2')}>
           {cards.map(card => (
             <CardRow key={card.id} card={card} />
           ))}
+          {adding && (
+            <li className="nodrag nopan flex border-l-[3px] border-l-border pr-2 pl-[5px]">
+              <CardEditor
+                topicId={topic.id}
+                onDone={() => setEditingId(null)}
+              />
+            </li>
+          )}
         </ul>
       )}
       {!collapsed && <TopicGhosts topicId={topic.id} />}

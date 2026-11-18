@@ -331,6 +331,69 @@ test.describe('cards', () => {
   })
 })
 
+test.describe('editing by hand', () => {
+  test('a card is edited in place: owner and due, saved with Enter, undone with Ctrl+Z', async ({
+    page,
+  }) => {
+    const errors = await open(page, 'live')
+    const before = await viewport(page)
+    // The transcript panel has list items too: look in the topic.
+    const inTopic = (text: string) =>
+      topic(page, 'Lead times').getByRole('listitem').filter({ hasText: text })
+    const row = inTopic('Draft the two options for UDO')
+    await row.hover()
+    await row.getByRole('button', { name: 'Edit card' }).click()
+
+    const form = page.getByRole('form', { name: 'Edit card' })
+    await expect(form.getByLabel('Card text')).toBeFocused()
+    await form.getByLabel('Due').fill('Thursday')
+    // Typing in the form is not a key of the map: no pin, no tidy, no fit.
+    await form.getByLabel('Card text').pressSequentially(' ptf')
+    await form.getByLabel('Card text').press('Enter')
+
+    await expect(form).toHaveCount(0)
+    await expect(inTopic('Draft the two options for UDO ptf')).toContainText(
+      'Zach · due Thursday'
+    )
+    await expect(pinsRail(page)).toContainText('PINS (2)')
+    expect(await viewport(page)).toBe(before)
+
+    await page.keyboard.press('Control+z')
+    await expect(inTopic('Draft the two options for UDO ptf')).toHaveCount(0)
+    await expect(inTopic('Draft the two options for UDO')).toBeVisible()
+    expect(errors).toEqual([])
+  })
+
+  test('a card is added from the topic menu and deleted with an Undo toast', async ({
+    page,
+  }) => {
+    await open(page, 'live')
+    await page.getByRole('button', { name: 'Menu for Artwork' }).click()
+    await page.getByRole('menuitem', { name: 'Add card' }).click()
+    const form = page.getByRole('form', { name: 'New card' })
+    await expect(form.getByLabel('Card text')).toBeFocused()
+    await form.getByLabel('Card text').fill('Ask for the font name')
+    await form.getByRole('radio', { name: 'Action' }).click()
+    await form.getByLabel('Owner').fill('Ant')
+    await form.getByRole('button', { name: 'Add' }).click()
+
+    const added = card(page, 'Ask for the font name')
+    await expect(added).toContainText('Ant')
+    await expect(topic(page, 'Artwork').getByLabel('4 cards')).toBeVisible()
+
+    await added.hover()
+    await added.getByRole('button', { name: 'Edit card' }).click()
+    await page
+      .getByRole('form', { name: 'Edit card' })
+      .getByRole('button', { name: 'Delete' })
+      .click()
+    await expect(added).toHaveCount(0)
+    const toast = page.getByRole('status').filter({ hasText: 'Deleted' })
+    await toast.getByRole('button', { name: 'Undo' }).click()
+    await expect(added).toBeVisible()
+  })
+})
+
 test.describe('pins and the topic menu', () => {
   test('P pins the active topic; Revisit brings it back with the accent border', async ({
     page,

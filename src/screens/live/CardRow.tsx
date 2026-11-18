@@ -1,7 +1,9 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { Pencil } from 'lucide-react'
 import { useStore } from 'zustand'
 import type { Card } from '@/engine/model'
 import { cn } from '@/lib/utils'
+import { CardEditor } from './CardEditor'
 import { clock, initials } from './format'
 import { KindIcon } from './KindIcon'
 import { KIND_BAR } from './kinds'
@@ -54,13 +56,15 @@ export function CardFace({ card }: { card: Card }) {
  * One card: a row inside its topic. Drag it by pointer to another topic, or
  * onto a card to go in front of it. `nodrag` keeps React Flow from dragging
  * the topic instead. A click plays what the card was made from, and the card
- * is outlined while that plays (UI_SPEC §2.5).
+ * is outlined while that plays (UI_SPEC §2.5). The pencil, or Enter on the
+ * card, opens it for editing in place (PRD F4.6).
  */
 /** A card with nothing cited still plays a little from where it points. */
 const UNCITED_MS = 8_000
 
 export function CardRow({ card }: { card: Card }) {
-  const { session, actions } = useLive()
+  const { session, actions, editingId, setEditingId } = useLive()
+  const editing = editingId === card.id
   // The span the card was made from: its first cited segment to its last.
   const endMs = useStore(session, state => {
     let end = 0
@@ -77,20 +81,44 @@ export function CardRow({ card }: { card: Card }) {
       state.playback.tMs >= card.created_t_ms &&
       state.playback.tMs < endMs
   )
-  const drag = useDraggable({ id: card.id })
+  const drag = useDraggable({ id: card.id, disabled: editing })
   const target: DropTarget = {
     type: 'card',
     cardId: card.id,
     topicId: card.topic_id,
   }
-  const drop = useDroppable({ id: `card:${card.id}`, data: target })
+  const {
+    setNodeRef: setDropRef,
+    isOver,
+    active,
+  } = useDroppable({ id: `card:${card.id}`, data: target })
   const setRef = (element: HTMLLIElement | null) => {
     drag.setNodeRef(element)
-    drop.setNodeRef(element)
+    setDropRef(element)
   }
   // dnd-kit would make the row a button; it is a list item that can be dragged.
   const { role: _role, ...attributes } = drag.attributes
-  const insertHere = drop.isOver && drop.active?.id !== card.id
+  const insertHere = isOver && active?.id !== card.id
+
+  if (editing) {
+    return (
+      <li
+        ref={setDropRef}
+        data-card-id={card.id}
+        data-kind={card.kind}
+        className={cn(
+          'nodrag nopan relative flex items-start gap-2 border-b border-l-[3px] pr-2 pl-[5px] last:border-b-0',
+          KIND_BAR[card.kind]
+        )}
+      >
+        <CardEditor
+          card={card}
+          topicId={card.topic_id}
+          onDone={() => setEditingId(null)}
+        />
+      </li>
+    )
+  }
 
   return (
     <li
@@ -98,7 +126,7 @@ export function CardRow({ card }: { card: Card }) {
       data-card-id={card.id}
       data-kind={card.kind}
       className={cn(
-        'nodrag nopan fade-in relative flex cursor-grab items-start gap-2 border-b border-l-[3px] py-1 pr-2 pl-[5px] last:border-b-0',
+        'group nodrag nopan fade-in relative flex cursor-grab items-start gap-2 border-b border-l-[3px] py-1 pr-2 pl-[5px] last:border-b-0',
         KIND_BAR[card.kind],
         drag.isDragging && 'opacity-40',
         playing && 'outline outline-1 -outline-offset-1 outline-accent'
@@ -106,6 +134,13 @@ export function CardRow({ card }: { card: Card }) {
       {...attributes}
       {...drag.listeners}
       onClick={() => actions.playSpan(card.created_t_ms, endMs)}
+      onKeyDown={event => {
+        if (event.key !== 'Enter' || event.target !== event.currentTarget) {
+          return
+        }
+        event.stopPropagation()
+        setEditingId(card.id)
+      }}
     >
       {insertHere && (
         <span
@@ -114,6 +149,19 @@ export function CardRow({ card }: { card: Card }) {
         />
       )}
       <CardFace card={card} />
+      {/* Out of the way until the card is pointed at or focused. */}
+      <button
+        type="button"
+        aria-label="Edit card"
+        className="absolute right-1 bottom-0.5 flex size-5 items-center justify-center rounded-md bg-surface text-text-muted opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-surface-2 focus-visible:opacity-100"
+        onPointerDown={event => event.stopPropagation()}
+        onClick={event => {
+          event.stopPropagation()
+          setEditingId(card.id)
+        }}
+      >
+        <Pencil size={11} aria-hidden />
+      </button>
     </li>
   )
 }
