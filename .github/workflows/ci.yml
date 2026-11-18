@@ -39,6 +39,18 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
+      # Two build scripts download native libraries: sherpa-onnx-sys into
+      # target/sherpa-onnx-prebuilt and ort-sys into the user's cache folder.
+      # The cache above keeps the record that they ran but not what they
+      # fetched, so a restored build links against files that are not there.
+      # Forgetting the record makes both scripts run again.
+      - name: Have the native-library build scripts run again
+        shell: pwsh
+        run: |
+          Get-ChildItem src-tauri/target -Recurse -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like 'sherpa-onnx-sys*' -or $_.Name -like 'ort-sys*' } |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm check
@@ -57,7 +69,7 @@ jobs:
         shell: pwsh
         run: |
           if (Test-Path test-output.txt) {
-            Select-String -Path test-output.txt -Pattern 'FAILED|panicked|^error|AssertionError|LNK\d+|left:|right:|×' |
+            Select-String -Path test-output.txt -CaseSensitive -Pattern 'FAILED|panicked|^error|AssertionError|LNK\d+|left:|right:|×' |
               Select-Object -First 9 |
               ForEach-Object { "::error::$($_.Line.Trim())" }
           }

@@ -107,6 +107,78 @@ New dependency: `lucide-react` (ISC) for card-kind icons. Build the "⋯" menu o
 
 Done means the M1 gate in BUILD_PLAN: golden replay ≥ 80% card match, 5/5 topic coverage, 0 wrong owners, both pins, with the mock in CI and with one real provider; the score for each provider recorded in this file; `live.png` and `live-ghost.png` shown to Matt.
 
+## M2 — Live capture and transcript (2026-11-19)
+
+Built on the reference PC in the order of the approved plan below. Everything that could be checked without a person in a room has been; the gate itself (TEST_PLAN §4) needs Matt and is described under "The gate test, for Matt".
+
+### What works, and how it was checked
+- **Capture.** The vendored Anarlog crates open the microphone and the WASAPI loopback of this PC, resample to 16 kHz and cancel echo; `capture_probe` showed both delivering audio (31 frames a second, no gaps). Our cutter turns that into utterances: 700 ms of silence ends one, 30 s is the longest, and past 10 s the next 300 ms pause ends it.
+- **Speech to text.** Parakeet-TDT 0.6B v3 (int8) through the official `sherpa-onnx` crate, on the CPU. The downloader was run against Hugging Face: a download cut to 300 MB resumed with a range request and passed its SHA-256.
+- **The whole pipeline in the real app** (`pnpm tauri dev`, the synthetic meeting playing as the microphone, driven through WebView2's debugging port): New meeting → Pre-meeting sheet → Start recording; transcript lines appear and the local model (`qwen3.5:4b`, through the core's relay) puts cards on the map; hold-to-pause holds, one click resumes; Stop leaves the meeting in review; Home lists it.
+- **Forced kill, in the real app.** A meeting was killed with `Stop-Process` 71 s in. On relaunch Home asked "Recover meeting “Bench kill”?"; Recover brought back 71.3 s of audio, the 17 transcript lines from before the kill plus one transcribed from the unheard tail, the 5 cards, and a timeline that plays. The same was done without the window (`soak.exe`): killed at 77 s, 75.1 s of audio and 18 segments recovered, 1 added.
+- **Timeline.** In the real app a click on the waveform had the playhead on screen 14 to 61 ms later; the core logged playback starting in 0 to 31 ms. A dragged region asked for a name and became a quote card.
+- **Screens.** `pnpm screenshot` writes 12 states in light and dark, among them `live`, `paused`, `nomic-error` and `model-missing`; reviewed against UI_SPEC §2.
+- **Tests.** 248 TypeScript tests, 56 Rust tests, 25 Playwright tests. No test needs a sound device or a model.
+
+### Numbers (reference PC: Ryzen 5 2600, 16 GB, Windows 10; all on synthetic speech)
+`scripts/make_test_audio.ps1` reads the golden fixture aloud with Windows' two built-in voices: 7.4 minutes, 46 lines. It is clean, evenly paced American English with no room, so these numbers are a floor for real meetings, not a prediction.
+
+| What | Result |
+| --- | --- |
+| Parakeet, real-time factor (`bench_stt`, 352 s of speech in 112 utterances) | 0.28 at 2 threads, 0.21 at 4, 0.19 at 6 |
+| Parakeet, time to transcribe one utterance at 6 threads | median 0.51 s, 95th percentile 1.27 s, longest 2.33 s (a 13.8 s utterance, before the 10 s cut) |
+| Parakeet, model load | 4.3 s (kept loaded between meetings) |
+| Silero VAD | 4.4 s for 444 s of audio |
+| Whisper large-v3-turbo, real-time factor at 6 threads | 2.12: slower than speech. Median 5.9 s an utterance. Not usable live on this CPU |
+| Segment on screen after the speech ends, real app, 2.7-minute meeting, one source | median 1.17 s, 95th percentile 2.11 s, worst 4.72 s (the first utterance, which waited for the model to load) |
+| Seek: click to playhead | 14–61 ms |
+| Recovery of a 71 s meeting | under 5 s, most of it loading the model |
+
+The latency is the cutter's 0.7 s of closing silence plus the recognition. The gate's "≤ 2 s" holds at the median with room to spare and is broken by long utterances: a 10 s utterance takes about 1.9 s to recognise on this CPU, so it lands near 2.6 s. The ways to shorten that are a lower cut-off than 10 s, or a GPU build of sherpa-onnx.
+
+### Not verified
+- **A real room.** Nothing here has heard a person. Accuracy on real voices, accents and Singlish, crosstalk, a noisy room, a far microphone: all unknown.
+- **Echo cancellation.** Loopback capture works, and system audio is transcribed as its own source. Whether the microphone's copy of the speakers is cancelled well enough to avoid doubled text (TEST_PLAN §4.3) needs speakers and a microphone in the same room, and a person to listen.
+- **The no-microphone path on real hardware.** The error is covered by tests with a stand-in source; nobody has unplugged a real microphone, before or during a meeting.
+- **A release build.** Everything ran as `pnpm tauri dev`. The installed app's origin differs, which is why the structurer's requests go through the core; that path was used in dev, not in a built app.
+- **Whisper in a meeting.** It downloads, verifies, loads and transcribes in the bench. It was not run in the app, where it would fall behind.
+
+### Built differently from the plan or the spec, for Matt to confirm
+- **The map is saved through a typed command, not SQL from the webview**, and `tauri-plugin-sql` is gone in favour of `sqlx` used from Rust. The approved plan said the webview would write through the plugin; the plugin cannot make a multi-row commit all-or-nothing (DECISIONS 2026-11-19).
+- **The structurer runs on the main thread and talks to Ollama through the core**, not from a Web Worker (DECISIONS 2026-11-19).
+- **Ten vendored crates, not eleven**: with `audio-utils` trimmed, `audio-mime` is not needed.
+- **Utterances are cut at 10 s, not 15 s**, at the next 300 ms pause.
+- **Data lives in `%LOCALAPPDATA%\co.custore.scribe`**, not the roaming profile.
+- **`Start recording` does not turn red on hover** (L5).
+- **A `Stop` button in the status strip, and a review screen after Stop**: UI_SPEC has no Stop control before the end screen exists.
+
+### Things M2 left unfinished
+- No level test in Settings, no search on Home, no `+` to add an agenda header mid-meeting, no way to remove a highlight, no microphone change during a meeting (DECISIONS 2026-11-19).
+- A model downloaded during a meeting is used from the next meeting on; the running one stays without a transcript.
+- Recovery transcribes at most the last two minutes of unheard audio per source. A meeting recorded with no model stays untranscribed: there is no "transcribe this recording" yet.
+- No diarization: every line from the microphone is `Room`, every line from loopback `System audio`.
+- `confidence` is always 1.0.
+- The local model repeats itself on short batches: in a 2.7-minute run it wrote the same decision ("quote 42 a set…") three times, each citing different segments, so the dedupe rule did not catch it. Windows' voices pause at every sentence, which makes many short utterances and small batches; a real meeting may behave differently. Worth a look with real transcripts before M3.
+- **Relaunching within a few seconds of a forced kill can fail.** The killed window's WebView2 processes take a moment to exit, and an app started before they have gone exits at once (seen once: started 23 s after the kill, exit code −1). Started again, it ran. An installed app killed from Task Manager takes its WebView2 processes with it, so this may be a dev-only effect; not investigated.
+- `ort` is built without `copy-dylibs`, so the app loads Windows' own `DirectML.dll`. Fine on Windows 10 and 11; the installer (M5) should decide whether to ship a newer one.
+- The vendored crates' own tests are not run: they need Anarlog's test data.
+
+### The gate test, for Matt (TEST_PLAN §4)
+Needs a microphone, speakers, and about 75 minutes. From `C:\dev\scribe`:
+1. `pnpm tauri dev`. On Home, the gear → **Audio**: pick the microphone, tick **Also record what this PC plays**. **Speech**: Parakeet should read "Installed".
+2. **New meeting**: title `Bench 60`, agenda `A`, `B`, `C`. **Start recording**.
+3. Speak for 2 minutes. Play a 20-minute podcast through the speakers; talk over it twice. Check: the podcast's lines read `System audio`, yours `Room`, and nothing appears twice. With a stopwatch, time 10 of your own lines from the end of the sentence to the text appearing; the median should be 2 s or less.
+4. Task Manager at 0, 30 and 60 minutes: `scribe.exe` should grow by less than 300 MB.
+5. At 45 minutes, end `scribe.exe` in Task Manager. Wait ten seconds, `pnpm tauri dev` again. Home should ask to recover `Bench 60`; **Recover** should show the transcript and a timeline that plays up to the kill. (Killing at 45 minutes ends that recording; for the 60-minute memory reading, run a second meeting or skip the kill on the first.)
+6. Timeline: click 5 transcript lines and 5 places on the waveform (the sound should start at once); drag across the waveform, name it, and see a quote card on the map.
+7. The numbers the app measured are in `%LOCALAPPDATA%\co.custore.scribe\meetings\<id>\stats.json` after Stop (not after a kill).
+
+### For the next session
+- `powershell -File scripts/soak.ps1 -Minutes 60 -Loopback` repeats the long run without a room; `-KillAtMinute 45` adds the kill and recovery; `-Devices` uses the real microphone.
+- The app's database and recordings from this session's test meetings are in `%LOCALAPPDATA%\co.custore.scribe` (`Bench 5`, `Bench kill`). Delete the folder's `meetings` directory and `scribe.db*` for a clean start; keep `models`.
+- CI's job log needs admin rights to read. The workflow now repeats the failing lines as annotations, which anyone can read through the checks API.
+- Speech-model hotwords (participants' and customers' names) would help: the bench heard "Kabs" as "Cabs" and "UDO" as "Udo" and "Uto". sherpa-onnx supports hotwords for transducers; not tried.
+
 ## M2 — plan (approved by Matt, 2026-11-19)
 
 Approved as recommended: the nine questions below are answered yes (1–6, 9), both model downloads are approved (7), and test speech may be played through the PC's speakers a few minutes at a time (8). Seven steps in BUILD_PLAN order, one or more commits per step, `pnpm check && pnpm test` before each commit, a push after each step.

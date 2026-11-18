@@ -13,18 +13,19 @@ End screen ──▶ Rust dispatch (Telegram, SMTP, .ics)
 
 | Module | Responsibility | Key crates |
 | --- | --- | --- |
-| `audio/capture.rs` | Enumerate devices; capture mic + WASAPI loopback; resample to 16 kHz mono f32; ring buffers | vendored `audio-actual` (Anarlog) or Meetily's cpal/WASAPI path; `cpal`, `wasapi` (MIT) |
-| `audio/aec.rs` | Echo cancellation so speaker output is not transcribed twice | vendored `aec` (Anarlog, ONNX) or WebRTC AEC3 via Talky's approach |
-| `audio/vad.rs` | Silero VAD; utterance boundaries (700 ms silence, 30 s max) | sherpa-onnx VAD via `sherpa-rs` |
-| `audio/writer.rs` | Write 10 s WAV/FLAC chunks per source; crash-safe | `hound` (Apache-2.0) |
-| `stt/mod.rs` | `trait Transcriber { fn feed(&mut self, utt: Utterance) -> Segment }`; impls `LocalSherpa` (Parakeet, Whisper), `CloudSpeechmatics` | `sherpa-rs` (MIT bindings to sherpa-onnx, Apache-2.0); `tokio-tungstenite` for Speechmatics |
+| `audio/capture.rs` | Enumerate devices; capture mic + WASAPI loopback; resample to 16 kHz mono f32; echo cancellation (inside the vendored capture stream); a file source for tests | vendored `audio-actual` and `aec` (Anarlog); `cpal`, `wasapi` (MIT) |
+| `audio/vad.rs` | Silero VAD; utterance boundaries (700 ms silence, 30 s max, a cut at the next 300 ms pause past 10 s) | vendored `vad` (Anarlog; Silero v6.2 through `ort`) |
+| `audio/writer.rs` | Write 10 s WAV chunks per source; crash-safe; repair after a kill | `hound` (Apache-2.0) |
+| `audio/peaks.rs`, `audio/levels.rs` | Waveform peaks (20 a second) and level meters (≤ 20 Hz) | — |
+| `audio/playback.rs` | Play the recording from any point, both sources mixed | `rodio` (MIT OR Apache-2.0) |
+| `stt/mod.rs` | `trait Transcriber { fn transcribe(&self, samples: &[f32]) -> Transcript }`; impls `LocalSherpa` (Parakeet, Whisper), later `CloudSpeechmatics` | `sherpa-onnx` (the official bindings, Apache-2.0); `tokio-tungstenite` for Speechmatics |
 | `stt/models.rs` | Model catalogue, download with resume + SHA-256, paths | `reqwest`, `sha2` |
-| `session/mod.rs` | Meeting state machine (idle → recording → paused → stopped); clock; assigns segment ids; fans out events | — |
+| `session/mod.rs` | Meeting state machine (idle → recording → paused → stopped); the meeting clock (it counts audio); assigns segment ids; fans out events. `session/recovery.rs`: a meeting that was being recorded when the app died | `ulid` |
 | `phones/mod.rs` | Join LiveKit room as the host; subscribe to audio tracks; per-track level; dominant-speaker arbitration; route the winning track into VAD/STT with the participant label; data channel for map snapshots and private notes | `livekit` (Rust SDK, Apache-2.0), `rust-dominant-speaker` (MIT/Apache-2.0) |
 | `scribe/hotkey.rs` | Global hold-to-talk; captures mic during hold into a separate buffer; emits `scribe:utterance` | `tauri-plugin-global-shortcut` |
 | `scribe/kws.rs` | Wake word via sherpa-onnx keyword spotting; 10 s window; chime | `sherpa-rs` |
 | `scribe/tts.rs` | Kokoro via sherpa-onnx TTS; gates the mic while speaking | `sherpa-rs` |
-| `store/` | SQLite schema + migrations; FTS5 on segments; retention job | `tauri-plugin-sql` (sqlx) |
+| `store/` | SQLite schema + migrations; FTS5 on segments; the map's rows; retention job (M5) | `sqlx` |
 | `dispatch/` | Telegram Bot API, SMTP, .ics generation | `reqwest`, `lettre` (MIT/Apache-2.0), `icalendar` (MIT/Apache-2.0) |
 | `ipc.rs` | All commands and events, typed once; tauri-specta generates `src/ipc.ts` | `tauri-specta` |
 
@@ -36,10 +37,11 @@ End screen ──▶ Rust dispatch (Telegram, SMTP, .ics)
 - `phone:joined/left {participant_id, name}` · `phone:note {participant_id, topic_id, text, t_ms}`
 - `scribe:utterance {text, t_ms}` (hotkey/wake word result; not a meeting segment)
 - `job:update {job_id, kind, status, result?}`
-- `model:download {model_id, bytes, total, done}`
+- `model:download {model_id, bytes, total, done, error?}`
+- `audio:peaks {meeting_id, from, peaks}` (the waveform, about once a second) · `capture:status {source, ok}` (a device went away or came back) · `playback:state {meeting_id, playing, t_ms}`
 
 ### Commands (UI → Rust)
-`create_meeting`, `start`, `pause`, `resume`, `stop`, `seek_play {t_ms}`, `play_span {t0,t1}`, `list_devices`, `set_devices`, `set_stt {engine, model}`, `download_model`, `set_hotkey`, `set_wake_word`, `speak {text}` / `stop_speaking`, `start_phone_room` → `{join_url, qr_png}`, `end_phone_room`, `run_research {card_id, query}`, `send_telegram {participant_id, text}`, `send_email {to, subject, body}`, `write_ics {…}`, `export {kind}`, `set_retention`.
+Built in M2: `create_meeting`, `list_meetings`, `get_meeting`, `start {meeting_id, options}` (microphone, loopback and model are options of `start`; there is no `set_devices` or `set_stt`), `pause`, `resume`, `stop`, `recording_state`, `list_devices`, `list_models`, `download_model`, `cancel_download`, `get_segments`, `search_segments`, `map_load`, `map_save`, `get_peaks`, `seek_play`, `play_span`, `stop_playback`, `list_highlights`, `save_highlight`, `delete_highlight`, `ollama_chat`, `unfinished_meetings`, `recover_meeting`. Still to come: `set_hotkey`, `set_wake_word`, `speak {text}` / `stop_speaking`, `start_phone_room` → `{join_url, qr_png}`, `end_phone_room`, `run_research {card_id, query}`, `send_telegram {participant_id, text}`, `send_email {to, subject, body}`, `write_ics {…}`, `export {kind}`, `set_retention`.
 
 ## 3. Map engine (`src/engine/`, pure TS)
 
@@ -103,10 +105,10 @@ Input: full outline with all accepted cards, pins, highlights, participants, lay
 
 ## 5. Vendored code (`crates/vendor/`)
 Copy by commit with LICENSE files; record commit SHAs in `docs/DECISIONS.md`.
-- `fastrepl/anarlog` crates: `audio-actual`, `aec`, `vad` (MIT; do not copy anything under `enterprise/`)
+- `fastrepl/anarlog` crates: `audio-actual`, `aec`, `vad` and the seven they depend on, at commit `9c1cbe2` (MIT; do not copy anything under `enterprise/`); `crates/vendor/anarlog/VENDORED.md` lists every change to the copy
 - `Zackriya-Solutions/meetily` cpal/WASAPI loopback (MIT) as the second reference when Anarlog's capture misbehaves
 - `thewh1teagle/vibe` crates `vad-rs`, `nemotron-diarize-rs` (MIT) — v1.1 diarization
-- Engines/bindings via crates.io: `sherpa-rs`, `livekit`, `rust-dominant-speaker`, `hound`, `lettre`, `icalendar`
+- Engines/bindings via crates.io: `sherpa-onnx` (official; `sherpa-rs` is archived), `livekit`, `rust-dominant-speaker`, `hound`, `lettre`, `icalendar`
 - Do not vendor: tldraw, Screenpipe, Amurex, Peaks.js, Piper, Porcupine, ELK, react-beautiful-dnd.
 
 ## 6. Secrets, privacy, retention

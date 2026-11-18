@@ -43,7 +43,16 @@ const PENDING_FILL = 'color-mix(in srgb, var(--accent) 25%, transparent)'
 function labelOf(text: string): HTMLElement {
   const label = document.createElement('span')
   label.textContent = text
-  label.className = 'block px-1 whitespace-nowrap text-meta text-text'
+  // wavesurfer draws inside a shadow root, where the app's classes do not
+  // reach: this one element is styled by hand, from the same tokens.
+  Object.assign(label.style, {
+    display: 'block',
+    padding: '0 4px',
+    whiteSpace: 'nowrap',
+    fontSize: '11px',
+    lineHeight: '16px',
+    color: 'var(--text)',
+  })
   return label
 }
 

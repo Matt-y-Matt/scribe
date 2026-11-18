@@ -165,10 +165,15 @@ export async function openMeeting(
         loopback: now.loopback,
       })
     } catch (error) {
-      if (reasonOf(error) === 'no_microphone') session.setState({ noMic: true })
-      else {
-        logger.error('recording could not start', { reason: reasonOf(error) })
+      const reason = reasonOf(error)
+      // No microphone, or one that would not open: say so and offer to try
+      // again. Anything else (the core is busy, the meeting already has a
+      // recording) is not the microphone's doing.
+      if (reason === 'no_microphone' || reason === 'capture') {
         session.setState({ noMic: true })
+      } else {
+        logger.error('recording could not start', { reason })
+        session.setState({ notStarted: true })
       }
     }
   }

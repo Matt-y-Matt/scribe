@@ -18,13 +18,15 @@ param(
 $ErrorActionPreference = "Stop"
 if (-not (Test-Path $Wav)) { throw "No audio at $Wav. Run scripts/make_test_audio.ps1 first, or pass -Wav." }
 
-cargo build --release --manifest-path src-tauri/Cargo.toml --example bench_stt
+# A debug build: the recogniser is sherpa-onnx's own optimised library either
+# way, and the release profile (LTO, one codegen unit) takes many minutes.
+cargo build --manifest-path src-tauri/Cargo.toml --example bench_stt
 if ($LASTEXITCODE -ne 0) { throw "The bench did not build." }
 
 $arguments = @("--wav", "`"$Wav`"", "--data", "`"$Data`"", "--model", $Model, "--threads", $Threads)
 if ($Text) { $arguments += "--text" }
 $out = New-TemporaryFile
-$process = Start-Process -FilePath "src-tauri/target/release/examples/bench_stt.exe" -ArgumentList $arguments `
+$process = Start-Process -FilePath "src-tauri/target/debug/examples/bench_stt.exe" -ArgumentList $arguments `
   -NoNewWindow -PassThru -RedirectStandardOutput $out
 # Keep a handle so the peak is still readable after the process has gone.
 $null = $process.Handle
