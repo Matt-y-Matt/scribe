@@ -4,7 +4,7 @@
 //! [`SpeechDetector`]: Silero through the vendored `vad` crate in the app, a
 //! plain energy gate in tests. Where an utterance starts and ends is decided
 //! here: 700 ms of silence ends one, none is longer than 30 s, and one that
-//! has run past 15 s is cut at the next 300 ms pause so a long speech does not
+//! has run past 10 s is cut at the next 300 ms pause so a long speech does not
 //! keep its text back.
 
 use super::{ms_of_samples, WINDOW};
@@ -91,7 +91,7 @@ impl Default for CutterConfig {
             end_probability: 0.35,
             end_silence_ms: 700,
             max_ms: 30_000,
-            soft_max_ms: 15_000,
+            soft_max_ms: 10_000,
             soft_silence_ms: 300,
             lead_ms: 192,
             tail_ms: 192,
@@ -105,6 +105,9 @@ impl Default for CutterConfig {
 pub struct Utterance {
     pub t0_ms: u32,
     pub t1_ms: u32,
+    /// Silence the cutter waited through before it closed the utterance:
+    /// how long ago the speech really ended when this was handed over.
+    pub closing_silence_ms: u32,
     pub samples: Vec<f32>,
 }
 
@@ -205,6 +208,7 @@ impl Cutter {
         let mut open = self.open.take()?;
         self.lead.clear();
 
+        let closing_silence_ms = ms_of_samples((open.silence_run * WINDOW) as u64);
         // Keep a short tail of the closing silence and drop the rest.
         let tail = windows_for(self.config.tail_ms);
         if open.silence_run > tail {
@@ -218,6 +222,7 @@ impl Cutter {
         Some(Utterance {
             t0_ms: ms_of_samples(open.start_sample),
             t1_ms: ms_of_samples(open.start_sample + open.samples.len() as u64),
+            closing_silence_ms,
             samples: open.samples,
         })
     }
@@ -334,7 +339,7 @@ mod tests {
             near(spans[1].0, 6_000 - 192) && near(spans[1].1, 20_000 + 192),
             "{spans:?}"
         );
-        // 17 s of speech passes the 15 s soft limit without a pause to cut
+        // 17 s of speech passes the 10 s soft limit without a pause to cut
         // at, so it runs to its own end.
         assert!(
             near(spans[2].0, 22_000 - 192) && near(spans[2].1, 39_000 + 192),
@@ -362,7 +367,7 @@ mod tests {
     }
 
     #[test]
-    fn past_15_s_a_300_ms_pause_is_enough_to_cut() {
+    fn past_10_s_a_300_ms_pause_is_enough_to_cut() {
         let signal = [tone(16_000), silence(400), tone(3_000), silence(1_000)].concat();
         let utterances = cut(&signal);
         assert_eq!(utterances.len(), 2);

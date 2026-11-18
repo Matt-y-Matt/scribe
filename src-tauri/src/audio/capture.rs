@@ -62,6 +62,17 @@ pub struct Capture {
     _keep: Box<dyn Send>,
 }
 
+impl Capture {
+    /// `keep` is whatever must stay alive while the capture is open; it is
+    /// dropped with it.
+    pub fn new(frames: mpsc::Receiver<CaptureMsg>, keep: impl Send + 'static) -> Self {
+        Self {
+            frames,
+            _keep: Box::new(keep),
+        }
+    }
+}
+
 pub trait Source: Send + Sync {
     fn microphones(&self) -> Vec<String>;
     fn default_microphone(&self) -> Option<String>;
@@ -148,15 +159,15 @@ impl Source for DeviceSource {
             let _ = tx.send(CaptureMsg::Ended).await;
         });
 
-        Ok(Capture {
-            frames: rx,
-            _keep: Box::new(DeviceGuard {
+        Ok(Capture::new(
+            rx,
+            DeviceGuard {
                 task,
                 // WASAPI loopback hands over nothing while the output device
                 // is idle, which would stall the microphone it is joined to.
                 _silence: loopback.then(AudioOutput::silence),
-            }),
-        })
+            },
+        ))
     }
 }
 
@@ -251,10 +262,7 @@ impl Source for FileSource {
             }
             let _ = tx.send(CaptureMsg::Ended).await;
         });
-        Ok(Capture {
-            frames: rx,
-            _keep: Box::new(AbortOnDrop(task)),
-        })
+        Ok(Capture::new(rx, AbortOnDrop(task)))
     }
 }
 

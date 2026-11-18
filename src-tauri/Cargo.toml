@@ -24,9 +24,7 @@ tauri-plugin-log = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-store = "2"
-# Added in M0 per docs/BUILD_PLAN.md; registered when their milestone needs them
-# (sql: M2 store, global-shortcut: M3 hold-to-talk).
-tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+# Added in M0 per docs/BUILD_PLAN.md; registered in M3 (hold-to-talk).
 tauri-plugin-global-shortcut = "2"
 
 # Capture, echo cancellation and VAD: Anarlog's crates, vendored by commit
@@ -42,6 +40,9 @@ thiserror = "2"
 reqwest = { version = "0.13", default-features = false, features = ["native-tls", "stream"] }
 sha2 = "0.10"
 tokio-util = "0.7"
+# The store: sqlx directly, with SQLite and FTS5 built in (DECISIONS 2026-11-19).
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
+ulid = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "fs", "io-util", "net"] }
 futures-util = "0.3"
 

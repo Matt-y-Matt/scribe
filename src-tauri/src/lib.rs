@@ -4,6 +4,7 @@
 
 pub mod audio;
 mod ipc;
+pub mod stt;
 
 use tauri::Manager;
 
