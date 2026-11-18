@@ -1,9 +1,12 @@
-//! Scribe's Rust core. Modules arrive with their milestone
-//! (docs/BUILD_PLAN.md): `audio`, `stt`, `session`, `store` in M2, `scribe`
-//! in M3, `phones` in M4, `dispatch` in M5.
+//! Scribe's Rust core (docs/ARCHITECTURE.md §2). `audio`, `stt`, `session`
+//! and `store` arrived in M2; `scribe` comes in M3, `phones` in M4,
+//! `dispatch` in M5.
 
 pub mod audio;
-mod ipc;
+pub mod ipc;
+pub mod session;
+mod state;
+pub mod store;
 pub mod stt;
 
 use tauri::Manager;
@@ -44,6 +47,13 @@ pub fn run() {
         .invoke_handler(ipc.invoke_handler())
         .setup(move |app| {
             ipc.mount_events(app);
+            // Recordings and models are large and belong to this PC, so they
+            // live under %LOCALAPPDATA%, not in the roaming profile.
+            let data_dir = app.path().app_local_data_dir()?;
+            let state =
+                tauri::async_runtime::block_on(state::AppState::open(app.handle(), data_dir))
+                    .map_err(Box::<dyn std::error::Error>::from)?;
+            app.manage(state);
             log::info!("Scribe {} starting", app.package_info().version);
             Ok(())
         })

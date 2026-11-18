@@ -4,6 +4,7 @@ import {
   afterRun,
   countWords,
   initialTrigger,
+  onClock,
   onSegment,
   type TimedSegment,
   type TriggerState,
@@ -109,5 +110,39 @@ describe('trigger', () => {
     expect(afterRun({ ...state, lastRunMs: 9_000 }, 5_000).lastRunMs).toBe(
       9_000
     )
+  })
+})
+
+describe('trigger on the clock', () => {
+  const heard = (count: number) => run([segment(0, 5_000, count)]).state
+
+  it('fires once the room has been quiet for 2 s, without a next segment', () => {
+    const state = heard(25)
+    expect(onClock(state, 6_900).fire).toBeNull()
+    const decision = onClock(state, 7_000)
+    expect(decision).toMatchObject({ fire: 'silence', atMs: 7_000 })
+    // The words are spent: the clock does not fire again for the same pause.
+    expect(onClock(decision.state, 60_000).fire).toBeNull()
+  })
+
+  it('does not fire with fewer than 25 new words, however long the quiet', () => {
+    expect(onClock(heard(24), 120_000).fire).toBeNull()
+  })
+
+  it('fires 45 s after the last run when the clock gets there first', () => {
+    // Speech with no 2 s pause: the last segment ended half a second ago.
+    const state: TriggerState = {
+      lastRunMs: 0,
+      newWords: 40,
+      lastEndMs: 44_500,
+    }
+    expect(onClock(state, 44_900).fire).toBeNull()
+    const decision = onClock(state, 45_000)
+    expect(decision).toMatchObject({ fire: 'elapsed', atMs: 45_000 })
+    expect(decision.state.newWords).toBe(0)
+  })
+
+  it('does nothing before the first segment', () => {
+    expect(onClock(initialTrigger(), 300_000).fire).toBeNull()
   })
 })

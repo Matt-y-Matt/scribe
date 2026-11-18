@@ -2,6 +2,11 @@
 
 One line per decision, newest first. Format: `YYYY-MM-DD — decision — why — who`.
 
+- 2026-11-19 — The store is `sqlx` used directly from Rust, and `tauri-plugin-sql` is removed. The map engine saves each commit through one typed command (`map_save`) that writes the touched rows in one transaction; it does not send SQL from the webview as the approved M2 plan said — the plugin runs each statement on whichever pooled connection is free, so a commit that touches several rows (a merge, an undo) could not be made all-or-nothing through it; with one writer in Rust the webview also needs no SQL permission. `sqlx` is what the plugin wraps, with SQLite and FTS5 compiled in — Claude, for Matt to confirm
+- 2026-11-19 — The database, the recordings and the speech models live in `%LOCALAPPDATA%co.custore.scribe` (Tauri's `app_local_data_dir`), not the roaming profile — a meeting is about 115 MB an hour per source and a model 0.7 to 1 GB; roaming profiles are synchronised on managed PCs. Settings stay where `tauri-plugin-store` puts them — Claude
+- 2026-11-19 — Speech to text: one model in memory, one recogniser thread per audio source; an utterance past 10 s ends at the next 300 ms pause (the plan said 15 s) — on the reference PC's CPU Parakeet takes about 0.19 s per second of speech, so a 15 s utterance would arrive 3 s late; with one thread a stretch of system audio would hold up what was said in the room. `confidence` is always 1.0: sherpa-onnx gives no score for these models — Claude
+- 2026-11-19 — Whisper large-v3-turbo stays the second catalogue entry but cannot be used live on the reference PC's CPU: it takes 2.1 s per second of speech (median 5.9 s an utterance) against Parakeet's 0.19. It needs a GPU build of sherpa-onnx, which M2 does not ship — measured with `bench_stt` on 2026-11-19 — Claude
+- 2026-11-19 — Recovery transcribes at most the last 2 minutes of each source after its last saved segment — the usual tail is one utterance; a meeting recorded with no model has no segments at all, and transcribing an hour of it at launch would hold the app for minutes with no way to cancel — Claude
 - 2026-11-19 — The half-day spike of the M2 plan passed on the reference PC: the vendored crates build with rustc 1.100, the microphone and WASAPI loopback both deliver audio, Silero runs, and `ort`'s ONNX Runtime and sherpa-onnx's link statically into one program. Anarlog's capture stays; Meetily's path is not needed — `src-tauri/examples/capture_probe.rs` is the proof and stays as a diagnostic — Claude
 - 2026-11-19 — `rodio` is built without its default features and `ort` without `copy-dylibs` in the vendored manifests — rodio's defaults bring Symphonia (MPL-2.0); `ort`'s DLL copy step panics under Cargo 1.100's build-folder layout during `cargo clippy`, and the models run on the CPU, where Windows' own `DirectML.dll` is enough to load — Claude
 - 2026-11-19 — Test speech is made on the PC by `scripts/make_test_audio.ps1`: Windows' built-in voices read a transcript fixture into `.test-audio/` (git-ignored) — capture, transcription, the soak and recovery can then be run without a room; it proves nothing about real voices or accents — Claude
@@ -70,7 +75,7 @@ Licence as declared in the npm or crates.io registry on the day the dependency w
 | dannysmith/tauri-template @ `8e0db1e` (source files; notice kept in `docs/licences/`) | MIT | M0 |
 | tauri, tauri-build, @tauri-apps/api, @tauri-apps/cli | Apache-2.0 OR MIT | M0 (template) |
 | tauri-plugin-log, tauri-plugin-single-instance, tauri-plugin-window-state | Apache-2.0 OR MIT | M0 (template) |
-| tauri-plugin-store, tauri-plugin-sql, tauri-plugin-global-shortcut (+ @tauri-apps/plugin-store, @tauri-apps/plugin-sql) | Apache-2.0 OR MIT | M0 |
+| tauri-plugin-store, tauri-plugin-global-shortcut (+ @tauri-apps/plugin-store); tauri-plugin-sql and @tauri-apps/plugin-sql until M2 removed them | Apache-2.0 OR MIT | M0 |
 | specta, tauri-specta, specta-typescript | MIT | M0 (template) |
 | serde, serde_json, log | MIT OR Apache-2.0 | M0 (template) |
 | react, react-dom, vite, @vitejs/plugin-react, @rolldown/plugin-babel, babel-plugin-react-compiler, tailwindcss, @tailwindcss/vite | MIT | M0 (template) |
@@ -91,9 +96,10 @@ Licence as declared in the npm or crates.io registry on the day the dependency w
 | Dependency of the vendored crates: cpal | Apache-2.0 | M2 |
 | hound | Apache-2.0 | M2 |
 | tokio, tokio-util | MIT | M2 |
-| futures-util, thiserror, reqwest, sha2 | MIT OR Apache-2.0 | M2 |
+| futures-util, thiserror, reqwest, sha2, sqlx (replaces tauri-plugin-sql), ulid (Rust), ndarray | MIT OR Apache-2.0 | M2 |
 | livekit (Rust SDK), livekit-client (JS) | Apache-2.0 | M4 |
 | rust-dominant-speaker | MIT/Apache-2.0 | M4 |
 | lettre, icalendar | MIT/Apache-2.0 | M5 |
-| Parakeet-TDT 0.6B v3 (model) | CC-BY-4.0 (attribution in About) | M2 |
+| Parakeet-TDT 0.6B v3 (model, downloaded by the user, not shipped) | CC-BY-4.0 (attribution in About) | M2 |
+| Whisper large-v3-turbo (model, downloaded by the user, not shipped) | MIT | M2 |
 | Kokoro-82M (model) | Apache-2.0 | M3 |

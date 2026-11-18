@@ -10,6 +10,174 @@
 export const commands = {
 async appInfo() : Promise<AppInfo> {
     return await TAURI_INVOKE("app_info");
+},
+async createMeeting(meeting: NewMeeting) : Promise<Result<MeetingInfo, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("create_meeting", { meeting }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Every meeting, newest first.
+ */
+async listMeetings() : Promise<Result<MeetingInfo[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_meetings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getMeeting(meetingId: string) : Promise<Result<MeetingInfo, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_meeting", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async start(meetingId: string, options: StartOptions) : Promise<Result<RecordingState, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start", { meetingId, options }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async pause() : Promise<Result<RecordingState, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("pause") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async resume() : Promise<Result<RecordingState, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("resume") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Ends the meeting. Returns once its last words are transcribed and saved.
+ */
+async stop() : Promise<Result<RecordingState, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async recordingState() : Promise<Result<RecordingState, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("recording_state") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listDevices() : Promise<Result<Devices, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_devices") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async listModels() : Promise<Result<ModelInfo[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("list_models") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Starts downloading a model and returns at once; `model:download` events
+ * carry the progress and the outcome.
+ */
+async downloadModel(modelId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("download_model", { modelId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Stops a download. What has arrived is kept, and the next download of the
+ * same model carries on from there.
+ */
+async cancelDownload(modelId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("cancel_download", { modelId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getSegments(meetingId: string) : Promise<Result<SegmentFinal[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_segments", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Full-text search of the transcript: one meeting, or every meeting when
+ * `meeting_id` is null.
+ */
+async searchSegments(meetingId: string | null, query: string) : Promise<Result<SegmentFinal[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("search_segments", { meetingId, query }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async mapLoad(meetingId: string) : Promise<Result<MapRows, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("map_load", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Saves one commit of the map engine, in one transaction.
+ */
+async mapSave(patch: MapPatch) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("map_save", { patch }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Meetings that were being recorded when the app last died.
+ */
+async unfinishedMeetings() : Promise<Result<MeetingInfo[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("unfinished_meetings") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async recoverMeeting(meetingId: string, modelId: string) : Promise<Result<Recovered, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("recover_meeting", { meetingId, modelId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -17,8 +185,18 @@ async appInfo() : Promise<AppInfo> {
 
 
 export const events = __makeEvents__<{
+audioLevels: AudioLevels,
+audioPeaks: AudioPeaks,
+captureStatus: CaptureStatus,
+modelDownload: ModelDownload,
+recordingState: RecordingState,
 segmentFinal: SegmentFinal
 }>({
+audioLevels: "audio:levels",
+audioPeaks: "audio:peaks",
+captureStatus: "capture:status",
+modelDownload: "model:download",
+recordingState: "recording:state",
 segmentFinal: "segment:final"
 })
 
@@ -29,9 +207,126 @@ segmentFinal: "segment:final"
 /** user-defined types **/
 
 /**
+ * Why a command failed, in a form the UI can act on.
+ */
+export type AppError = { kind: "no_microphone" } | { kind: "capture"; detail: string } | { kind: "busy" } | { kind: "not_recording" } | { kind: "not_found" } | { kind: "already_recorded" } | { kind: "storage"; detail: string }
+/**
  * Name and version of the running app.
  */
 export type AppInfo = { name: string; version: string }
+/**
+ * `audio:levels`, at most 20 times a second.
+ */
+export type AudioLevels = { sources: SourceLevel[] }
+/**
+ * `audio:peaks` — the next stretch of the waveform, 20 peaks per second of
+ * meeting, each 0–255.
+ */
+export type AudioPeaks = { meeting_id: string; 
+/**
+ * Index of the first peak in this batch.
+ */
+from: number; peaks: number[] }
+/**
+ * `capture:status` — a source stopped or started delivering audio.
+ */
+export type CaptureStatus = { 
+/**
+ * `laptop` or `system`.
+ */
+source: string; ok: boolean }
+export type CardKind = "note" | "decision" | "action" | "research" | "quote"
+export type CardRow = { id: string; meeting_id: string; topic_id: string; kind: CardKind; text: string; owner: string | null; due_text: string | null; segment_ids: string[]; status: CardStatus; source: ChangeSource; created_t_ms: number; confirmed: boolean; order_key: number }
+export type CardStatus = "proposed" | "accepted" | "dismissed"
+/**
+ * Who made a change to the map.
+ */
+export type ChangeSource = "engine" | "user" | "scribe"
+export type DeletedRow = { entity: MapEntity; id: string }
+export type Devices = { microphones: string[]; 
+/**
+ * `None` when the PC has no microphone.
+ */
+default_microphone: string | null }
+export type MapEntity = "topic" | "card" | "suggestion"
+/**
+ * One commit of the map engine: the rows as they are now, and the rows that
+ * are gone. Saved in one transaction.
+ */
+export type MapPatch = { topics: TopicRow[]; cards: CardRow[]; suggestions: SuggestionRow[]; deleted: DeletedRow[] }
+/**
+ * The saved map of one meeting.
+ */
+export type MapRows = { topics: TopicRow[]; cards: CardRow[]; suggestions: SuggestionRow[] }
+/**
+ * A meeting as the UI lists it. Wall-clock times are milliseconds since
+ * 1970 as `f64`, which holds them exactly and crosses to TypeScript as a
+ * number.
+ */
+export type MeetingInfo = { id: string; title: string; created_at_ms: number; started_at_ms: number | null; ended_at_ms: number | null; 
+/**
+ * Length of the recording on the meeting clock.
+ */
+duration_ms: number; mode: MeetingMode; agenda: string[]; participants: string[]; 
+/**
+ * Whether system audio was recorded as well as the microphone.
+ */
+loopback: boolean }
+export type MeetingMode = "group" | "solo"
+/**
+ * `model:download` — progress of a speech model download. Sizes are bytes,
+ * as `f64` so they cross to TypeScript as numbers.
+ */
+export type ModelDownload = { model_id: string; bytes: number; total: number; 
+/**
+ * True on the last event: installed, cancelled or failed.
+ */
+done: boolean; 
+/**
+ * Why it stopped, when it did not finish.
+ */
+error: string | null }
+export type ModelInfo = { id: string; title: string; languages: string; licence: string; bytes: number; installed: boolean; 
+/**
+ * A download of this model is running.
+ */
+downloading: boolean }
+export type NewMeeting = { title: string; 
+/**
+ * Agenda headers, in order.
+ */
+agenda: string[]; mode: MeetingMode; 
+/**
+ * Names of the people expected, for owner matching.
+ */
+participants: string[] }
+export type RecState = "idle" | "recording" | "paused" | "stopped"
+/**
+ * `recording:state`
+ */
+export type RecordingState = { 
+/**
+ * `None` while idle.
+ */
+meeting_id: string | null; state: RecState; 
+/**
+ * The meeting clock.
+ */
+elapsed_ms: number; 
+/**
+ * False when there is no speech model to transcribe with: the meeting
+ * is recorded and the transcript is off (PRD F3.4).
+ */
+transcribing: boolean }
+export type Recovered = { meeting_id: string; 
+/**
+ * Length of the audio that was saved.
+ */
+duration_ms: number; 
+/**
+ * Segments transcribed from audio the app had not got to.
+ */
+segments_added: number }
 /**
  * `segment:final` — one finished utterance of the meeting transcript.
  * 
@@ -39,6 +334,34 @@ export type AppInfo = { name: string; version: string }
  * `laptop`, `system` or `phone:{participant_id}`.
  */
 export type SegmentFinal = { id: string; meeting_id: string; t0_ms: number; t1_ms: number; speaker_label: string; source: string; text: string; confidence: number }
+export type SourceLevel = { 
+/**
+ * `laptop` or `system`.
+ */
+id: string; rms: number }
+export type StartOptions = { 
+/**
+ * A name from `list_devices`; `None` is the default microphone.
+ */
+microphone: string | null; 
+/**
+ * Also record and transcribe what the PC plays.
+ */
+loopback: boolean; 
+/**
+ * A model id from the catalogue.
+ */
+model_id: string }
+export type SuggestionKind = "move" | "merge" | "pin"
+export type SuggestionRow = { id: string; meeting_id: string; kind: SuggestionKind; 
+/**
+ * The suggestion's payload as JSON; its shape belongs to the engine.
+ */
+payload_json: string; status: SuggestionStatus; created_t_ms: number }
+export type SuggestionStatus = "open" | "accepted" | "dismissed"
+export type TopicKind = "header" | "topic"
+export type TopicRow = { id: string; meeting_id: string; parent_id: string | null; title: string; kind: TopicKind; order_key: number; status: TopicStatus; off_agenda: boolean; created_t_ms: number; pinned_t_ms: number | null; revisited_t_ms: number | null; scheduled_t_ms: number | null; segment_ids: string[] }
+export type TopicStatus = "active" | "pinned" | "done"
 
 /** tauri-specta globals **/
 

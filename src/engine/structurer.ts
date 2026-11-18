@@ -5,7 +5,13 @@ import { cardsIn, headersOf, type MapState } from './model'
 import type { StructurerInput, StructurerProvider } from './providers/types'
 import type { SegmentSink } from './replay/replay'
 import type { MapStore } from './store'
-import { afterRun, countWords, initialTrigger, onSegment } from './trigger'
+import {
+  afterRun,
+  countWords,
+  initialTrigger,
+  onClock,
+  onSegment,
+} from './trigger'
 
 // The structurer loop, docs/ARCHITECTURE.md §3.2. It listens to the
 // transcript, decides when a run is due, sends the model what is new and
@@ -130,6 +136,21 @@ export class Structurer implements SegmentSink {
       this.waiting.push(event)
       if (decision.fire === 'elapsed') this.makeDue('elapsed', decision.atMs)
     }
+    this.pump()
+  }
+
+  /**
+   * The meeting clock, when it moves without a segment: a live meeting calls
+   * this about once a second, so a run that silence makes due starts while
+   * the room is still quiet.
+   */
+  clock(nowMs: number): void {
+    this.store.tick(nowMs)
+    const decision = onClock(this.trigger, nowMs)
+    this.trigger = decision.state
+    if (decision.fire === null) return
+    // Everything heard so far belongs to this run.
+    this.makeDue(decision.fire, decision.atMs)
     this.pump()
   }
 

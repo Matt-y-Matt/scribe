@@ -81,6 +81,31 @@ export function onSegment(
   return { fire: null, state: { ...state, newWords, lastEndMs } }
 }
 
+/**
+ * Tells the trigger what time it is when no segment has arrived. In a live
+ * meeting the room can go quiet and stay quiet, and the run that silence
+ * calls for must not wait for the next person to speak.
+ */
+export function onClock(state: TriggerState, nowMs: number): TriggerDecision {
+  if (state.newWords < MIN_NEW_WORDS) return { fire: null, state }
+  if (state.lastEndMs !== null && nowMs - state.lastEndMs >= SILENCE_MS) {
+    const atMs = state.lastEndMs + SILENCE_MS
+    return {
+      fire: 'silence',
+      atMs,
+      state: { ...state, lastRunMs: atMs, newWords: 0 },
+    }
+  }
+  if (nowMs - state.lastRunMs >= MAX_WAIT_MS) {
+    return {
+      fire: 'elapsed',
+      atMs: nowMs,
+      state: { ...state, lastRunMs: nowMs, newWords: 0 },
+    }
+  }
+  return { fire: null, state }
+}
+
 /** After a run that took everything heard so far: start counting afresh. */
 export function afterRun(state: TriggerState, atMs: number): TriggerState {
   return { ...state, lastRunMs: Math.max(state.lastRunMs, atMs), newWords: 0 }
