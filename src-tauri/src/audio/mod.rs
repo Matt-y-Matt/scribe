@@ -6,6 +6,7 @@
 //! always agree.
 
 pub mod capture;
+pub mod echo;
 pub mod levels;
 pub mod peaks;
 pub mod playback;

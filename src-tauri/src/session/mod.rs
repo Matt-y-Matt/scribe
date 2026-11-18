@@ -12,7 +12,7 @@ pub mod recovery;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -21,11 +21,12 @@ use specta::Type;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::audio::capture::{Capture, CaptureError, CaptureMsg, CaptureOptions, Frame, Source};
+use crate::audio::echo::{self, SystemHistory};
 use crate::audio::levels::LevelMeter;
 use crate::audio::peaks::PeakMeter;
 use crate::audio::vad::{CutterConfig, Segmenter, SpeechDetector, Utterance};
 use crate::audio::writer::ChunkWriter;
-use crate::audio::{ms_of_samples, SourceKind};
+use crate::audio::{ms_of_samples, samples_of_ms, SourceKind};
 use crate::ipc::SegmentFinal;
 use crate::store::Store;
 use crate::stt::{SttError, Transcriber};
@@ -191,6 +192,9 @@ pub struct SessionStats {
     pub latency_median_ms: u32,
     pub latency_p95_ms: u32,
     pub latency_max_ms: u32,
+    /// Microphone utterances dropped as the speakers' echo (audio/echo.rs).
+    #[serde(default)]
+    pub echoes_dropped: u32,
 }
 
 #[derive(Default)]
@@ -217,6 +221,7 @@ impl StatsLog {
             latency_median_ms: at(0.5),
             latency_p95_ms: at(0.95),
             latency_max_ms: at(1.0),
+            echoes_dropped: 0,
         }
     }
 }
@@ -228,6 +233,7 @@ struct Shared {
     samples: AtomicU64,
     transcribing: AtomicBool,
     stats: Mutex<StatsLog>,
+    echoes_dropped: AtomicU32,
 }
 
 impl Shared {
@@ -277,6 +283,9 @@ struct Pipeline {
     system_writer: Option<ChunkWriter>,
     laptop_cut: Segmenter,
     system_cut: Option<Segmenter>,
+    /// The system audio of the last half minute, to tell the speakers' echo
+    /// in the microphone from a person. `None` when loopback is off.
+    system_heard: Option<SystemHistory>,
     levels: LevelMeter,
     peaks: PeakMeter,
     peak_batch: Vec<u8>,
@@ -328,7 +337,11 @@ impl Pipeline {
             self.send_peaks();
         }
 
+        if let Some(heard) = self.system_heard.as_mut() {
+            heard.push(system);
+        }
         self.laptop_cut.push(&frame.laptop, &mut self.found);
+        self.drop_echoes();
         Self::queue(&self.laptop_jobs, SourceKind::Laptop, &mut self.found);
         if let (Some(cut), Some(jobs)) = (self.system_cut.as_mut(), self.system_jobs.as_ref()) {
             cut.push(system, &mut self.found);
@@ -341,6 +354,33 @@ impl Pipeline {
         self.shared
             .samples
             .fetch_add(frame.laptop.len() as u64, Ordering::Relaxed);
+    }
+
+    /// Takes out the microphone utterances that are the speakers and not a
+    /// person, before they cost a recognition and show up twice.
+    fn drop_echoes(&mut self) {
+        let Some(heard) = self.system_heard.as_ref() else {
+            return;
+        };
+        let before = self.found.len();
+        self.found.retain(|utterance| {
+            let judged = echo::check(&utterance.samples, heard, samples_of_ms(utterance.t0_ms));
+            if judged.echo {
+                log::debug!(
+                    "echo dropped at {} ms: correlation {:.2}, {:.0} dB under the system audio",
+                    utterance.t0_ms,
+                    judged.correlation,
+                    judged.below_db
+                );
+            }
+            !judged.echo
+        });
+        let dropped = (before - self.found.len()) as u32;
+        if dropped > 0 {
+            self.shared
+                .echoes_dropped
+                .fetch_add(dropped, Ordering::Relaxed);
+        }
     }
 
     fn queue(jobs: &std::sync::mpsc::Sender<Job>, source: SourceKind, found: &mut Vec<Utterance>) {
@@ -374,6 +414,7 @@ impl Pipeline {
     /// At a pause, and at the end: nothing half-heard is left behind.
     fn settle(&mut self) {
         self.laptop_cut.flush(&mut self.found);
+        self.drop_echoes();
         Self::queue(&self.laptop_jobs, SourceKind::Laptop, &mut self.found);
         if let (Some(cut), Some(jobs)) = (self.system_cut.as_mut(), self.system_jobs.as_ref()) {
             cut.flush(&mut self.found);
@@ -524,6 +565,7 @@ impl Session {
             samples: AtomicU64::new(0),
             transcribing: AtomicBool::new(false),
             stats: Mutex::new(StatsLog::default()),
+            echoes_dropped: AtomicU32::new(0),
         });
 
         // Speech-to-text runs on its own threads: one loads the model, then
@@ -584,6 +626,7 @@ impl Session {
             system_cut: options
                 .loopback
                 .then(|| Segmenter::new((deps.detector)(), CutterConfig::default())),
+            system_heard: options.loopback.then(SystemHistory::new),
             levels: LevelMeter::default(),
             peaks: PeakMeter::default(),
             peak_batch: Vec::new(),
@@ -757,14 +800,19 @@ async fn run(
     if let Err(error) = deps.store.mark_ended(&shared.meeting_id, duration_ms).await {
         log::error!("the meeting's end could not be saved: {error}");
     }
-    let stats = shared
+    let mut stats = shared
         .stats
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
         .summary();
+    stats.echoes_dropped = shared.echoes_dropped.load(Ordering::Relaxed);
     log::info!(
-        "meeting stopped: {duration_ms} ms, {} segments, latency median {} ms, p95 {} ms, max {} ms",
-        stats.segments, stats.latency_median_ms, stats.latency_p95_ms, stats.latency_max_ms
+        "meeting stopped: {duration_ms} ms, {} segments, latency median {} ms, p95 {} ms, max {} ms, {} echoes dropped",
+        stats.segments,
+        stats.latency_median_ms,
+        stats.latency_p95_ms,
+        stats.latency_max_ms,
+        stats.echoes_dropped
     );
     if let Ok(json) = serde_json::to_string_pretty(&stats) {
         let _ = std::fs::write(
@@ -847,6 +895,32 @@ pub mod testing {
                 let frame = Frame {
                     laptop: window.clone(),
                     system: system.then_some(window),
+                };
+                feed.send(CaptureMsg::Frame(frame))
+                    .await
+                    .expect("the session is listening");
+            }
+        }
+
+        /// Sends these samples, in whole windows; `system` is the system
+        /// audio of the same moment, padded with silence if it is shorter.
+        pub async fn play_signals(&self, laptop: &[f32], system: Option<&[f32]>) {
+            let feed = self
+                .feed
+                .lock()
+                .unwrap()
+                .clone()
+                .expect("the capture is open");
+            let window = |samples: &[f32], index: usize| -> Vec<f32> {
+                let start = (index * WINDOW).min(samples.len());
+                let mut piece = samples[start..(start + WINDOW).min(samples.len())].to_vec();
+                piece.resize(WINDOW, 0.0);
+                piece
+            };
+            for index in 0..laptop.len().div_ceil(WINDOW) {
+                let frame = Frame {
+                    laptop: window(laptop, index),
+                    system: system.map(|samples| window(samples, index)),
                 };
                 feed.send(CaptureMsg::Frame(frame))
                     .await
@@ -1082,16 +1156,22 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn with_loopback_both_sources_are_recorded_and_labelled() {
+        use crate::audio::echo::testing::speechlike;
         let rig = rig("loopback", true).await;
         meeting(&rig.store, "m_1").await;
         rig.session.start("m_1", options(true)).await.unwrap();
-        rig.source.play(2_000, true, true).await;
-        rig.source.play(1_000, false, true).await;
+        // Someone in the room and someone on the call, both for 2 s, saying
+        // different things; then a second of quiet.
+        let mut room = speechlike(7, 2_000, 0.1);
+        room.extend(vec![0.0f32; 16_000]);
+        let mut call = speechlike(1, 2_000, 0.3);
+        call.extend(vec![0.0f32; 16_000]);
+        rig.source.play_signals(&room, Some(&call)).await;
         rig.session.stop().await.unwrap();
 
         for source in SourceKind::ALL {
             let samples = recorded_samples(&audio_dir(&rig.data_dir, "m_1", source)).unwrap();
-            assert_eq!(samples, 3_040 * 16, "{source:?}");
+            assert_eq!(samples, 3_008 * 16, "{source:?}");
         }
         let mut found: Vec<(String, String)> = rig
             .store
@@ -1118,9 +1198,14 @@ mod tests {
         let rig = rig("mute", true).await;
         meeting(&rig.store, "m_1").await;
         rig.session.start("m_1", options(true)).await.unwrap();
+        use crate::audio::echo::testing::speechlike;
         rig.mute_system.store(true, Ordering::Relaxed);
-        rig.source.play(2_000, true, true).await;
-        rig.source.play(1_000, false, true).await;
+        // The room talks while the PC plays the recording back.
+        let mut room = speechlike(7, 2_000, 0.1);
+        room.extend(vec![0.0f32; 16_000]);
+        let mut played = speechlike(1, 2_000, 0.3);
+        played.extend(vec![0.0f32; 16_000]);
+        rig.source.play_signals(&room, Some(&played)).await;
         rig.session.stop().await.unwrap();
 
         let sources: Vec<String> = rig
@@ -1225,6 +1310,77 @@ mod tests {
                 ok: false
             }]
         );
+        let _ = std::fs::remove_dir_all(&rig.data_dir);
+    }
+
+    fn stats_of(rig: &Rig) -> SessionStats {
+        let json =
+            std::fs::read_to_string(meeting_dir(&rig.data_dir, "m_1").join("stats.json")).unwrap();
+        serde_json::from_str(&json).unwrap()
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn the_speakers_heard_by_the_microphone_are_not_transcribed_twice() {
+        use crate::audio::echo::testing::speechlike;
+        let rig = rig("echo", true).await;
+        meeting(&rig.store, "m_1").await;
+        rig.session.start("m_1", options(true)).await.unwrap();
+
+        // The PC plays 3 s of speech; the microphone hears it 40 ms later
+        // and quieter. Then a second and a half of quiet.
+        let mut system = speechlike(1, 3_000, 0.3);
+        system.extend(vec![0.0f32; 24_000]);
+        let echo: Vec<f32> = (0..system.len())
+            .map(|index| {
+                if index >= 640 {
+                    0.3 * system[index - 640]
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        rig.source.play_signals(&echo, Some(&system)).await;
+        rig.session.stop().await.unwrap();
+
+        let sources: Vec<String> = rig
+            .store
+            .segments("m_1")
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|segment| segment.source)
+            .collect();
+        assert_eq!(sources, ["system"], "the echo is not a second speaker");
+        assert_eq!(stats_of(&rig).echoes_dropped, 1);
+        let _ = std::fs::remove_dir_all(&rig.data_dir);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_person_talking_over_the_speakers_is_still_transcribed() {
+        use crate::audio::echo::testing::speechlike;
+        let rig = rig("talkover", true).await;
+        meeting(&rig.store, "m_1").await;
+        rig.session.start("m_1", options(true)).await.unwrap();
+
+        let mut system = speechlike(1, 3_000, 0.3);
+        system.extend(vec![0.0f32; 24_000]);
+        let mut talker = speechlike(7, 3_000, 0.1);
+        talker.extend(vec![0.0f32; 24_000]);
+        rig.source.play_signals(&talker, Some(&system)).await;
+        rig.session.stop().await.unwrap();
+
+        let mut sources: Vec<String> = rig
+            .store
+            .segments("m_1")
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|segment| segment.source)
+            .collect();
+        sources.sort();
+        sources.dedup();
+        assert_eq!(sources, ["laptop", "system"]);
+        assert_eq!(stats_of(&rig).echoes_dropped, 0);
         let _ = std::fs::remove_dir_all(&rig.data_dir);
     }
 

@@ -84,8 +84,9 @@ function Audio() {
             Also record what this PC plays
           </span>
           <span className="block text-meta text-text-muted">
-            For online calls: the other side is transcribed as “System audio”,
-            and its echo is taken out of the microphone.
+            For online calls: the other side is transcribed as “System audio”.
+            Use headphones if you can: from speakers, some of the call can reach
+            the microphone and show up a second time as “Room”.
           </span>
         </span>
       </label>
