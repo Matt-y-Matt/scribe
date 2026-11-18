@@ -176,6 +176,9 @@ Needs a microphone, speakers, and about 75 minutes. From `C:\dev\scribe`:
 ### For the next session
 - `powershell -File scripts/soak.ps1 -Minutes 60 -Loopback` repeats the long run without a room; `-KillAtMinute 45` adds the kill and recovery; `-Devices` uses the real microphone.
 - The app's database and recordings from this session's test meetings are in `%LOCALAPPDATA%\co.custore.scribe` (`Bench 5`, `Bench kill`). Delete the folder's `meetings` directory and `scribe.db*` for a clean start; keep `models`.
+- The app's own window can be driven by a script: start `pnpm tauri dev` with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` and connect Playwright with `chromium.connectOverCDP('http://127.0.0.1:9222')`. That is how the real-app checks above were made; with `SCRIBE_TEST_AUDIO` set as well, no microphone is needed.
+- With Chrome and Ollama open the PC has under 2 GB free, and a full Rust build can run out of memory (rustc exits with code 1 and no message). `CARGO_BUILD_JOBS=4` gets through.
+- `cargo test` rebuilds the example tools, so it fails while `soak.exe` is running; `cargo test --lib` does not.
 - CI's job log needs admin rights to read. The workflow now repeats the failing lines as annotations, which anyone can read through the checks API.
 - Speech-model hotwords (participants' and customers' names) would help: the bench heard "Kabs" as "Cabs" and "UDO" as "Udo" and "Uto". sherpa-onnx supports hotwords for transducers; not tried.
 

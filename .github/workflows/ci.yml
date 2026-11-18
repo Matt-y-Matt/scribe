@@ -41,15 +41,23 @@ jobs:
 
       # Two build scripts download native libraries: sherpa-onnx-sys into
       # target/sherpa-onnx-prebuilt and ort-sys into the user's cache folder.
-      # The cache above keeps the record that they ran but not what they
-      # fetched, so a restored build links against files that are not there.
-      # Forgetting the record makes both scripts run again.
+      # The cache above keeps the record that they ran, and the folders they
+      # made, but not the libraries they fetched, so a restored build links
+      # against files that are not there. Removing the record and what is left
+      # of the download makes both scripts start from nothing.
       - name: Have the native-library build scripts run again
         shell: pwsh
         run: |
           Get-ChildItem src-tauri/target -Recurse -Directory -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -like 'sherpa-onnx-sys*' -or $_.Name -like 'ort-sys*' } |
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          if (Test-Path src-tauri/target/sherpa-onnx-prebuilt) {
+            Get-ChildItem src-tauri/target/sherpa-onnx-prebuilt -Recurse -File |
+              Select-Object -First 5 | ForEach-Object { "left by the cache: $($_.FullName) ($($_.Length) bytes)" }
+            Remove-Item -Recurse -Force src-tauri/target/sherpa-onnx-prebuilt
+          } else {
+            "the cache restored no sherpa-onnx-prebuilt folder"
+          }
 
       - run: pnpm install --frozen-lockfile
 
