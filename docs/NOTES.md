@@ -107,6 +107,95 @@ New dependency: `lucide-react` (ISC) for card-kind icons. Build the "⋯" menu o
 
 Done means the M1 gate in BUILD_PLAN: golden replay ≥ 80% card match, 5/5 topic coverage, 0 wrong owners, both pins, with the mock in CI and with one real provider; the score for each provider recorded in this file; `live.png` and `live-ghost.png` shown to Matt.
 
+## M2 — plan (approved by Matt, 2026-11-19)
+
+Approved as recommended: the nine questions below are answered yes (1–6, 9), both model downloads are approved (7), and test speech may be played through the PC's speakers a few minutes at a time (8). Seven steps in BUILD_PLAN order, one or more commits per step, `pnpm check && pnpm test` before each commit, a push after each step.
+
+### What I checked before planning
+- **Anarlog** (`fastrepl/anarlog`, MIT outside `enterprise/`): head of `main` is `9c1cbe287019e7ca199ee77bd5f6d095cf076ad8` (2026-11-17). `audio-actual`, `aec` and `vad` exist, but they do not stand alone. `audio-actual` needs `audio`, `audio-device`, `audio-interface`, `audio-sync`, `audio-utils`, `resampler` and `aec`; `aec` and `vad` need `onnx`; `audio-utils` needs `audio-mime`. That is 11 crates, not 3. None is under `enterprise/`.
+- `audio-actual` already does mic + WASAPI loopback → resample → echo cancellation in one stream (`AudioInput::from_mic_and_speaker`). `vad` is Silero v6.2 and returns a speech probability per 32 ms; cutting utterances from that is ours to write.
+- `aec` and `vad` run their models through `ort` (`=2.0.0-rc.10`, MIT OR Apache-2.0), which downloads ONNX Runtime when it builds. sherpa-onnx carries its own ONNX Runtime. Two copies in one program may clash at link time.
+- `audio-utils` pulls in `vorbis_rs` (a C build) and `rodio` with `symphonia-all`. Symphonia is **MPL-2.0**, which the stack line ("all MIT/Apache/BSD") does not cover. `audio-actual` uses three small functions from `audio-utils`.
+- **`sherpa-rs` is deprecated.** Its repository was archived on 2026-03-08 and its README says to use the official bindings. The last release, 0.6.8 (2025-10-05), is pinned to sherpa-onnx v1.12.15. The official crate is `sherpa-onnx` 2.0.1 (Apache-2.0, 2026-10-27, from k2-fsa), with examples for Parakeet, Whisper, Silero VAD, keyword spotting and Kokoro.
+- **Models** (Hugging Face, files fetched one by one, so no archive to unpack): Parakeet-TDT 0.6B v3 int8, `csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8` at revision `ed5d745`, 670 MB in four files, CC-BY-4.0, SHA-256 published for the three model files. Whisper turbo int8, `csukuangfj/sherpa-onnx-whisper-turbo` at `2ca6ff6`, 1,037 MB in three files, SHA-256 published.
+- **This PC**: one microphone endpoint and two outputs (headphones, the monitor's speakers) are present; whether the microphone hears the room is not known. C: has 92 GB free. The RTX 3070 already has 3.7 of 8 GB in use by Ollama. `cmake`, `clang`, `ffmpeg` and `gh` are not installed; nothing below needs them. Two Windows speech voices are installed (David, Zira).
+
+### Step 1 — Vendor the capture crates; mic + loopback → utterances
+1. A half-day spike first, before any capture code of ours: copy the 11 crates into `crates/vendor/anarlog/` at the commit above with the MIT `LICENSE`, build them, and run one small program that opens the microphone and the loopback and prints levels. The same spike links `ort` and sherpa-onnx into one binary to see whether the two ONNX Runtimes coexist. If the crates do not build or capture misbehaves within the half day, switch to Meetily's cpal/WASAPI path and write down why (`prompts/milestones.md`).
+2. What is changed in the vendored copy, and nothing else: each `workspace = true` dependency becomes the version Anarlog's root `Cargo.toml` pins; tests, benches and example data that need Anarlog's test crates are left out; of the AEC models only the 128 pair (7 MB) is copied, not the 256 and 512 pairs (57 MB); `audio-utils` is cut to the three functions `audio-actual` uses, which keeps Symphonia and the Vorbis C build out. Each change is listed in `crates/vendor/anarlog/VENDORED.md`. Capture, AEC and VAD code is not rewritten.
+3. Ours, in `src-tauri/src/audio/`: `capture.rs` (devices, start and stop, a `Source` trait with the real capture and a file source that plays a WAV at real time for tests), `vad.rs` (utterance cutter: 700 ms of silence ends an utterance, 30 s is the longest; over 15 s it cuts at the next 300 ms pause so a long speech does not wait), `levels.rs` (`audio:levels` at 20 Hz).
+4. Tests: the cutter on a synthetic 40 s signal with gaps, with a stand-in for the Silero model; the 30 s limit; levels batching. No test needs a sound device, so CI can run them.
+5. Vendored crates are path dependencies outside lint and format checks (`.prettierignore`, clippy runs on our package only).
+
+### Step 2 — Speech to text and the model downloader
+1. `stt/mod.rs`: `trait Transcriber`, `LocalSherpa` running Parakeet-TDT 0.6B v3 int8 on the CPU on its own thread, one utterance at a time, `mic` and `system` in arrival order.
+2. `stt/models.rs`: a catalogue (Parakeet first, Whisper turbo second) with file names, sizes, SHA-256 and the pinned revision; a downloader with HTTP range resume, a `.part` file, a hash check before the rename, and a re-download when the hash is wrong; `model:download` events; cancel. Models live in the app data folder under `models/`.
+3. The app runs with no model: capture and recording still work, the transcript is off and the live screen says so (the model-missing banner).
+4. Tests: SHA mismatch rejects a file; resume from a partial file against a local test server; catalogue paths. A transcription test on a short WAV runs only when the model is on disk, so CI does not download 670 MB.
+5. A first run of the RTF bench here, not in step 7, because CPU or GPU is decided by that number.
+6. New dependencies: `sherpa-onnx` or `sherpa-rs` (question 1), `hound`, `reqwest`, `sha2`, `ulid`.
+
+### Step 3 — Session, audio on disk, SQLite
+1. `session/mod.rs`: idle → recording → paused → stopped; the meeting clock (paused time does not count); segment ids (`s_` + ULID); `recording:state` once a second and on every change. Commands `create_meeting`, `start`, `pause`, `resume`, `stop`, `list_devices`, `set_devices`, `set_stt`, `download_model`.
+2. `audio/writer.rs`: 10 s WAV files per source (16 kHz, mono, 16-bit, what the recogniser heard) under `meetings/{id}/audio/{source}/`, the header rewritten every second so a kill loses at most the last second. About 115 MB an hour per source.
+3. `store/`: the schema of ARCHITECTURE §3.1 as migrations, FTS5 on segment text, WAL mode. Rust writes meetings, segments and the chunk index as they happen, so they survive a dead window. The map (topics, cards, suggestions) is written by a new `SqliteAdapter` in `src/engine/` through `@tauri-apps/plugin-sql`, one transaction per commit, undo and redo included. `MemoryAdapter` stays for tests and the `?screen=` fixtures, which run without Tauri.
+4. Live segments go into the engine the replay harness already feeds, so the map builds during a real meeting; the structurer's silence trigger is ticked from the meeting clock. The webview may then call Ollama on `127.0.0.1:11434` and nothing else (CSP).
+5. Tests: state machine transitions; a chunk file cut short mid-write is repaired; adapter round trip (load equals what was persisted, undo included) against an in-memory SQLite; FTS query.
+
+### Step 4 — Status strip and transcript panel
+1. Status strip (UI_SPEC §2.1): indicator with elapsed time, PAUSED in grey, 300 ms hold to pause and one click to resume; agenda chips that scroll the map to their column; a level meter for the laptop; the `silent | speaking` toggle shown but fixed to silent until M3; the privacy pill reading `local`; the gear.
+2. Transcript panel: time column in mono, source label, text; follows live text until the user scrolls up, then a "Jump to live" button; a search box over the meeting (FTS). Click a segment to play its span.
+3. Where it goes is question 3 (L2). My proposal: the right column under the Pins rail, as a `Transcript` tab that the scribe panel joins as a second tab in M3.
+4. The screens the manual test cannot run without (L3), in their smallest form: a Pre-meeting sheet (title, agenda, consent line, Start recording), Settings with the Audio and Speech tabs only, and Home listing meetings from SQLite. `pnpm tauri dev` then reaches the live screen through New meeting.
+5. Error states: no microphone (banner with "Open audio settings", recording refuses to start), model missing (banner with "Download model", recording still allowed).
+6. Screenshot states added: `paused`, `nomic-error`, `model-missing`, plus `premeeting`, `settings-audio`, `settings-speech`, `home-list`. `live` now includes the strip, the transcript and the timeline. Playwright: jump-to-live appears and works; hold-to-pause.
+
+### Step 5 — Timeline
+1. Rust computes waveform peaks as chunks close (20 points a second) and sends them batched; wavesurfer draws them with the Regions plugin. A one-hour spike first to confirm wavesurfer 8 draws from peaks alone and redraws a growing recording cheaply.
+2. Playback is in Rust (`seek_play`, `play_span`, as ARCHITECTURE §2 lists them), reading the chunk files; the playhead comes back as an event. Transport, `Space`, `[`, `]`, `H`.
+3. While the recording plays back during a live meeting, system audio is not transcribed, or the meeting would hear and transcribe itself.
+4. Highlights: drag a region, name it, it is stored in `highlights` and becomes a quote card under the active topic (undoable). A click on a card seeks to its first segment and outlines the card while it plays (left open by M1).
+5. Speaker bands: one strip per source (`laptop`, `system`), labels only.
+6. Tests: peak maths in Rust; Playwright on a fixture: click seeks, a dragged region makes a quote card. Seek latency is logged in-process.
+
+### Step 6 — Recovery
+1. On launch, a meeting with no end time is unfinished: Home shows "Recover meeting <title>?" with Recover and Not now. Nothing is ever deleted by declining.
+2. Recover: repair the last chunk of each source, rebuild the chunk index and peaks, transcribe any audio after the last saved segment, load the map from SQLite, mark the meeting stopped at the last chunk.
+3. Tests: Rust unit tests for repair and re-index. Then the real thing: record from the file source, kill the process from outside at a known time, relaunch, compare.
+
+### Step 7 — Bench
+`scripts/bench_stt.ps1` (TEST_PLAN §1) runs a small Rust binary: real-time factor, per-utterance latency (median and 95th percentile), peak memory, for Parakeet at 2, 4 and 6 threads, and for Whisper turbo if it is on disk. Results into this file.
+
+### Questions for Matt
+1. **`sherpa-rs` or the official `sherpa-onnx` crate?** CLAUDE.md and BUILD_PLAN name `sherpa-rs`, which is now archived. I recommend the official crate: same engine, maintained, Apache-2.0, and M3's wake word and Kokoro are in it. It changes one line of the stack description.
+2. **Eleven vendored crates, one trimmed.** Is vendoring the whole dependency set at one commit fine, with `audio-utils` cut down to avoid MPL-2.0 Symphonia? The alternative keeps `audio-utils` whole and accepts MPL-2.0 as a dependency licence.
+3. **Transcript panel place (L2):** a tab in the right column under Pins, shared with the scribe panel from M3?
+4. **Minimal Pre-meeting, Settings (Audio, Speech) and Home list in M2 (L3)?** TEST_PLAN §4 starts with them. Without them the test has to be driven by a dev-only shortcut.
+5. **Live map in M2?** Step 3.4 wires real segments into the structurer with local Ollama. It is not in the M2 gate, but saved topics and cards cannot be shown without it.
+6. **Pause (L4):** UI_SPEC's 300 ms hold to pause, one click to resume. Keep?
+7. **Downloads to approve:** Parakeet v3 int8, 670 MB from Hugging Face, needed. Whisper turbo int8, 1,037 MB, only to prove the second catalogue entry and bench it; say no and it stays an untested entry. Building also fetches ONNX Runtime and the sherpa-onnx libraries (about 100 MB, once).
+8. **Sound from the PC during my tests.** To test loopback I play synthetic speech (Windows' built-in voice reading the fixture) through the default output, a few minutes at a time. Fine, or headphones-only hours?
+9. **Labels without diarization:** I plan `Room` for the laptop microphone and `System audio` for loopback. Say if you want other words.
+
+### What needs Matt at the PC
+- A working microphone, and which device to use. I can see an endpoint, not whether it hears the room.
+- TEST_PLAN §4 itself: the 60-minute meeting with real speech and a podcast through the speakers, the two talk-overs (echo cancellation: no doubled text), the stopwatch on ten segments, the Task Manager memory readings, the kill at 45 minutes and the relaunch, and listening to the timeline play.
+- A real recording or two with the team's accents, if the default model is to be chosen from numbers (DECISIONS 2026-11-17).
+
+### What I can verify without Matt
+- Everything automated: unit tests, Playwright, the screenshots in both themes, Windows CI.
+- The whole pipeline on synthetic speech: the file source for the microphone path, and real WASAPI loopback for the system path. That gives measured segment latency, a 60-minute soak with memory readings, a forced kill and recovery, seek latency, and the RTF bench. It does not prove echo cancellation or a real room, and it is not the gate.
+
+### Risks
+- Two ONNX Runtimes in one process (step 1 spike). Way out: sherpa-onnx as shared libraries, or Silero through sherpa-onnx with only AEC on `ort`.
+- Parakeet on the Ryzen 5 2600's CPU may not hold ≤ 2 s on long utterances. Ways out, in order: more threads, the 15 s soft cut, a GPU build (DirectML or CUDA, with 4 GB of VRAM already Ollama's).
+- Anarlog's Windows capture is the newer of its platforms (DECISIONS 2026-11-17). Way out: Meetily's path.
+- The release build's webview origin (`http://tauri.localhost`) may be refused by Ollama's default CORS list; `pnpm tauri dev` is not affected. Way out: send the structurer's calls through Rust.
+- CI has no sound device and gets slower with two native downloads; capture is kept behind a trait so tests never open a device.
+
+### Out of scope for M2
+Diarization and named speakers, phones, the scribe panel and hotkey, Speechmatics, the other Settings tabs, the end screen, retention, the installer.
+
 ## Open spec questions
 
 Raised at kickoff, not yet answered. Fix them in the docs before the session that needs them.
