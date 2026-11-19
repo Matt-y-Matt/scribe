@@ -97,6 +97,9 @@ export async function openMeeting(
       body => backend.ollamaChat(body)
     ),
     log: (message, context) => logger.info(message, context),
+    // A run that failed keeps its lines for the next one, so the map
+    // catches up by itself; until then the host is told it is behind.
+    onRun: run => session.setState({ notesOff: run.error !== undefined }),
   })
 
   const mine = (id: string | null) => id === meetingId

@@ -187,6 +187,8 @@ describe('adding a card by hand', () => {
       kind: 'note',
       source: 'user',
       owner: null,
+      // Mid-meeting nothing is ticked: that is the end screen's doing.
+      confirmed: false,
     })
     expect(screen.queryByRole('form')).toBeNull()
   })

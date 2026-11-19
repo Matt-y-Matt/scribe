@@ -73,6 +73,49 @@ describe('EndScreen', () => {
     expect(store.log.at(-1)?.source).toBe('engine')
   })
 
+  it('ticks a card the model adds after the screen has opened', async () => {
+    const { store } = show()
+    const text = await summaryText()
+    await waitFor(() => expect(text.value).toContain('## Decisions'))
+    const topic = Object.values(store.getState().topics).find(
+      row => row.title === 'Pricing'
+    )
+    if (!topic) throw new Error('no topic')
+
+    act(() => {
+      store.commit('add_card', 'engine', [
+        {
+          entity: 'card',
+          id: 'c_late',
+          before: null,
+          after: {
+            id: 'c_late',
+            meeting_id: 'm_fixture',
+            topic_id: topic.id,
+            kind: 'decision',
+            text: 'Send the quote on Monday',
+            owner: null,
+            due_text: null,
+            segment_ids: [],
+            status: 'accepted',
+            source: 'engine',
+            created_t_ms: 380_000,
+            confirmed: false,
+            order_key: 99,
+          },
+        },
+      ])
+    })
+    await waitFor(() =>
+      expect(text.value).toContain('- Send the quote on Monday (00:06:20)')
+    )
+    expect(
+      screen.getByRole('checkbox', {
+        name: 'In the summary: Send the quote on Monday',
+      })
+    ).toBeChecked()
+  })
+
   it('takes an unticked row out of the summary and the drafts', async () => {
     show()
     const text = await summaryText()

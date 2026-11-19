@@ -15,6 +15,7 @@ import {
   LiveZoomedOut,
   ModelMissing,
   NoMicError,
+  NotesOff,
   Paused,
   Review,
 } from './live/LiveFixtures'
@@ -32,6 +33,7 @@ export const SCREENS: Record<ScreenId, ComponentType> = {
   paused: Paused,
   'nomic-error': NoMicError,
   'model-missing': ModelMissing,
+  'notes-off': NotesOff,
   review: Review,
   end: End,
   'settings-audio': SettingsAudio,

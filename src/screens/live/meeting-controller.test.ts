@@ -217,6 +217,23 @@ describe('openMeeting', () => {
     expect(now().view).toBe('wrap')
   })
 
+  it('says the map is behind when the local model does not answer', async () => {
+    // The core that is not there refuses every request to the model.
+    const { backend, say } = core(meeting())
+    const running = await open(backend)
+    expect(running.session.getState().notesOff).toBe(false)
+
+    const words = Array.from({ length: 30 }, (_, n) => `word${n}`).join(' ')
+    say.segment(segment('s_1', 0, words))
+    // Three seconds of quiet, then more talk: a run is due.
+    say.segment(segment('s_2', 5_000, 'and then'))
+    await vi.waitFor(() =>
+      expect(running.session.getState().notesOff).toBe(true)
+    )
+    // The lines are still there to read.
+    expect(running.session.getState().segments).toHaveLength(2)
+  })
+
   it('saves the new meeting’s headers, and every later commit', async () => {
     const { backend, saved } = core(meeting())
     const running = await open(backend)

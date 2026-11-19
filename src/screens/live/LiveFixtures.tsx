@@ -18,8 +18,8 @@ function fixtureScreen(
 ) {
   return function LiveFixture() {
     const [store] = useState(() =>
-      mode === 'no-mic' || mode === 'model-missing'
-        ? // Nothing was transcribed, so nothing is on the map but the agenda.
+      mode === 'no-mic' || mode === 'model-missing' || mode === 'notes-off'
+        ? // Nothing was written, so nothing is on the map but the agenda.
           new MapStore({
             meeting: fixtureStore().getState().meeting,
             agenda: ['CLA quote', 'Supplier delays', 'Designer hire'],
@@ -84,6 +84,9 @@ export const Paused = fixtureScreen({ until: 's022' }, undefined, 'paused')
 
 /** Start was pressed on a PC with no microphone. */
 export const NoMicError = fixtureScreen({}, undefined, 'no-mic')
+
+/** Recording and transcribing, with the local model not answering. */
+export const NotesOff = fixtureScreen({ until: 's010' }, undefined, 'notes-off')
 
 /** A finished meeting opened again: the map, the transcript, the recording. */
 export const Review = fixtureScreen({ pins: FIXTURE_PINS }, undefined, 'review')

@@ -28,6 +28,11 @@ export interface SessionState {
   micLost: boolean
   /** No speech model: the meeting is recorded, the transcript is off. */
   modelMissing: boolean
+  /**
+   * The model that writes the map did not answer the last time it was
+   * asked. The meeting is still recorded and transcribed.
+   */
+  notesOff: boolean
   /** System audio is being recorded too. */
   loopback: boolean
   segments: readonly SegmentFinal[]
@@ -78,6 +83,7 @@ export const emptySession = (
   noMic: false,
   micLost: false,
   modelMissing: false,
+  notesOff: false,
   loopback: false,
   segments: [],
   levels: { laptop: 0, system: 0 },

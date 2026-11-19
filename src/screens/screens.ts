@@ -14,6 +14,7 @@ export const SCREEN_IDS = [
   'paused',
   'nomic-error',
   'model-missing',
+  'notes-off',
   'review',
   'end',
   'settings-audio',

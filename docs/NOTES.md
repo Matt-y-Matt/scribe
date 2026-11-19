@@ -107,6 +107,40 @@ New dependency: `lucide-react` (ISC) for card-kind icons. Build the "⋯" menu o
 
 Done means the M1 gate in BUILD_PLAN: golden replay ≥ 80% card match, 5/5 topic coverage, 0 wrong owners, both pins, with the mock in CI and with one real provider; the score for each provider recorded in this file; `live.png` and `live-ghost.png` shown to Matt.
 
+## After M2 — the screens around a meeting (2026-11-19)
+
+Matt asked to keep building before his real 60-minute meeting (planned for 2026-11-20), on parts that do not lean on capture. The M2 gate is still open; see "The gate test, for Matt" below. Nothing in capture, echo handling, the cutter or speech-to-text was touched. The one change in the Rust core is two commands that read and save a meeting's summary. Proposals for what to build next, for Matt to pick from, are in `docs/PROPOSALS.md`.
+
+### What was built, and how it was checked
+- **Edit a card on the map** (PRD F4.6). The pencil on a card, or Enter with the card focused, opens it in its own row: text, kind, and for an action the owner and due date; Delete is there too, with the Undo toast. The topic menu has **Add card**. Each save is one operation, so `Ctrl+Z` takes it back.
+- **Home** (UI_SPEC §3.1). A search box over titles, agenda, people and every transcript; a meeting that matched on what was said shows the lines, and a line opens the meeting playing from that moment. A click on a meeting now selects it and shows its decisions, actions and pins on the right; **Open** or a double-click goes in.
+- **End screen** (UI_SPEC §3.3, M5 task 1 without sending). **Stop now goes here.** Decisions, actions, pinned topics and quotes, each with a tick; text, owner and due date are edited in place; an action with no owner is pointed out. The summary is written from the ticked rows as they change, in three layouts, with no model. A layout the host types is written by `qwen3.5:4b` on this PC. One draft per owner, with Copy. The summary is saved with the meeting. **Map and recording** goes to the review screen, and a past meeting has a **Summary** button.
+- **`Ctrl+K`** (UI_SPEC §4.6): finds topics, cards and transcript lines of the open meeting. Enter on a topic or card puts that topic at the top left of the map; a line plays.
+- **A banner when the map is not being written**: if the local model does not answer, the live screen says so. Before this the map just stayed empty.
+- **Checked in the real app** (`pnpm tauri dev`, the synthetic meeting as the microphone, driven through the debugging port): a 1.5-minute meeting; a card edited and one added by hand; `Ctrl+K`; Stop → end screen with the summary already written; an owner changed there; the one-pager layout; Map and recording → a click on the waveform had the playhead up in 103 ms → Summary; Finish; Home's preview and search; the meeting reopened with its summary, layout and ticks as left.
+- **Tests**: 296 TypeScript, 67 Rust, 31 Playwright, all passing locally. `pnpm screenshot` now covers 16 states, light and dark.
+
+### Not verified
+- **The model-written layout, beyond one try.** Asked for "one short paragraph in plain words, then the actions as a table" on a cut of the fixture's notes, the local model answered in 42 s with a correct table and a paragraph that got a condition wrong (it wrote that the quote is 42 *if* a Q2 batch is signed; the notes say 42, or 40 if it is signed) and added dollar signs. The screen says a model wrote the text and to read it against the lists. The three built-in layouts use no model and cannot do this.
+- **Copy** in the installed app. `navigator.clipboard` was not exercised in the real window.
+- **A long meeting on the end screen.** The lists were seen with 4 decisions and 11 actions; 40 actions were not tried.
+- **CI** for these commits was not waited for.
+
+### Built differently from the spec, for Matt to confirm
+- **Stop lands on the end screen** as UI_SPEC §3.3 says, which replaces the earlier choice of staying on the map (listed under M2 below). The map and the recording are one button away.
+- **Everything is ticked when the end screen first opens**, and the host unticks what is wrong. UI_SPEC says only that a tick means "in the summary". The alternative, nothing ticked, makes the host tick fifteen boxes after every meeting.
+- **The three summary layouts are written without a model.** PRD F10.2 describes a generator that takes a layout instruction; the instruction box does that, with the local model. The presets being instant and unable to invent anything seemed worth more than their being model-written.
+- **A click on a meeting in Home selects it; Open or a double-click goes in.** It used to open on one click. The preview needed a selection.
+- **Drafts are copied, not sent**, and edits to a draft are kept only while the screen is open. Sending is M5.
+
+### Left unfinished here
+- No export to a file (Markdown, txt, srt, JSON): the summary can be copied.
+- A card added on the map after the first wrap-up starts ticked only if it was added by hand in review; anything else added later starts unticked.
+- Pinned topics have **Schedule** on the end screen, which marks them; the `.ics` file is M5.
+- Home's preview does not show the written summary, only the lists it was made from.
+- Still missing from the M2 list: the level test in Settings, `+` to add an agenda header mid-meeting, removing a highlight, changing microphone mid-meeting.
+- `scripts/shot.ts` is a helper for one screenshot of a screen state after a few clicks; it needs `vite` on port 4173.
+
 ## M2 — Live capture and transcript (2026-11-19)
 
 Built on the reference PC in the order of the approved plan below. Everything that could be checked without a person in a room has been; the gate itself (TEST_PLAN §4) needs Matt and is described under "The gate test, for Matt".
@@ -154,10 +188,10 @@ The latency is the cutter's 0.7 s of closing silence plus the recognition. The g
 - **Utterances are cut at 10 s, not 15 s**, at the next 300 ms pause.
 - **Data lives in `%LOCALAPPDATA%\co.custore.scribe`**, not the roaming profile.
 - **`Start recording` does not turn red on hover** (L5).
-- **A `Stop` button in the status strip, and a review screen after Stop**: UI_SPEC has no Stop control before the end screen exists.
+- **A `Stop` button in the status strip.** UI_SPEC has no Stop control. (When this was written Stop left the meeting on its map, in review; since the end screen was built Stop goes there. See "After M2" above.)
 
 ### Things M2 left unfinished
-- No level test in Settings, no search on Home, no `+` to add an agenda header mid-meeting, no way to remove a highlight, no microphone change during a meeting (DECISIONS 2026-11-19).
+- No level test in Settings, no `+` to add an agenda header mid-meeting, no way to remove a highlight, no microphone change during a meeting (DECISIONS 2026-11-19).
 - A model downloaded during a meeting is used from the next meeting on; the running one stays without a transcript.
 - Recovery transcribes at most the last two minutes of unheard audio per source. A meeting recorded with no model stays untranscribed: there is no "transcribe this recording" yet.
 - No diarization: every line from the microphone is `Room`, every line from loopback `System audio`.
@@ -175,13 +209,14 @@ Needs a microphone, speakers, and about 75 minutes. From `C:\dev\scribe`:
 2. **New meeting**: title `Bench 60`, agenda `A`, `B`, `C`. **Start recording**.
 3. Speak for 2 minutes. Play a 20-minute podcast through the speakers; talk over it twice. Check: the podcast's lines read `System audio`, yours `Room`, and nothing appears twice. With a stopwatch, time 10 of your own lines from the end of the sentence to the text appearing; the median should be 2 s or less.
 4. Task Manager at 0, 30 and 60 minutes: `scribe.exe` should grow by less than 300 MB.
+   (When you press **Stop** the app now goes to the end screen. **Map and recording**, top left, takes you to the map, transcript and timeline for step 6.)
 5. At 45 minutes, end `scribe.exe` in Task Manager. Wait ten seconds, `pnpm tauri dev` again. Home should ask to recover `Bench 60`; **Recover** should show the transcript and a timeline that plays up to the kill. (Killing at 45 minutes ends that recording; for the 60-minute memory reading, run a second meeting or skip the kill on the first.)
 6. Timeline: click 5 transcript lines and 5 places on the waveform (the sound should start at once); drag across the waveform, name it, and see a quote card on the map.
 7. The numbers the app measured are in `%LOCALAPPDATA%\co.custore.scribe\meetings\<id>\stats.json` after Stop (not after a kill).
 
 ### For the next session
 - `powershell -File scripts/soak.ps1 -Minutes 60 -Loopback` repeats the long run without a room; `-KillAtMinute 45` adds the kill and recovery; `-Devices` uses the real microphone.
-- The app's database and recordings from this session's test meetings are in `%LOCALAPPDATA%\co.custore.scribe` (`Bench 5`, `Bench kill`). Delete the folder's `meetings` directory and `scribe.db*` for a clean start; keep `models`.
+- The app's database and recordings from this session's test meetings are in `%LOCALAPPDATA%\co.custore.scribe` (`Bench 5`, `Bench kill`, `Smoke end screen`). Delete the folder's `meetings` directory and `scribe.db*` for a clean start; keep `models`.
 - The app's own window can be driven by a script: start `pnpm tauri dev` with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` and connect Playwright with `chromium.connectOverCDP('http://127.0.0.1:9222')`. That is how the real-app checks above were made; with `SCRIBE_TEST_AUDIO` set as well, no microphone is needed.
 - With Chrome and Ollama open the PC has under 2 GB free, and a full Rust build can run out of memory (rustc exits with code 1 and no message). `CARGO_BUILD_JOBS=4` gets through.
 - `cargo test` rebuilds the example tools, so it fails while `soak.exe` is running; `cargo test --lib` does not.

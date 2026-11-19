@@ -20,7 +20,13 @@ import {
 // and actions that change the page and nothing else.
 
 export type FixtureMode =
-  'recording' | 'paused' | 'no-mic' | 'model-missing' | 'review' | 'wrap'
+  | 'recording'
+  | 'paused'
+  | 'no-mic'
+  | 'model-missing'
+  | 'notes-off'
+  | 'review'
+  | 'wrap'
 
 export interface FixtureSessionOptions {
   /** Stop after this segment. Default: the whole meeting. */
@@ -92,10 +98,14 @@ export function fixtureSessionState(
     view: mode === 'wrap' ? 'wrap' : 'map',
     elapsedMs,
     modelMissing: mode === 'model-missing',
+    notesOff: mode === 'notes-off',
     // With no model the meeting is recorded and nothing is transcribed.
     segments: mode === 'model-missing' ? [] : heard,
     levels: {
-      laptop: mode === 'recording' || mode === 'model-missing' ? 0.04 : 0,
+      laptop:
+        mode === 'recording' || mode === 'model-missing' || mode === 'notes-off'
+          ? 0.04
+          : 0,
       system: 0,
     },
     peaks,

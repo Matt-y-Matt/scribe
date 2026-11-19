@@ -53,10 +53,10 @@ export function EndScreen({
 
   // The first time a meeting is wrapped up, everything is in: the host
   // takes out what is wrong instead of ticking what is right.
-  const opened = useRef(false)
+  const seen = useRef<Set<string> | null>(null)
   useEffect(() => {
-    if (!saved.data || opened.current) return
-    opened.current = true
+    if (!saved.data || seen.current) return
+    seen.current = new Set(Object.keys(store.getState().cards))
     const listed = listedCards(store.getState())
     if (saved.data.markdown === null && !listed.some(card => card.confirmed)) {
       confirmCards(
@@ -67,6 +67,35 @@ export function EndScreen({
       )
     }
   }, [saved.data, store])
+
+  // The model's last pass over the meeting finishes after Stop: the cards
+  // it adds then are in, like the ones that were here when the screen opened.
+  useEffect(
+    () =>
+      store.subscribe(() => {
+        const known = seen.current
+        if (!known) return
+        const late = listedCards(store.getState()).filter(
+          card => !known.has(card.id)
+        )
+        for (const card of Object.values(store.getState().cards)) {
+          known.add(card.id)
+        }
+        const unticked = late.filter(
+          card => card.source === 'engine' && !card.confirmed
+        )
+        if (unticked.length === 0) return
+        queueMicrotask(() =>
+          confirmCards(
+            store,
+            unticked.map(card => card.id),
+            true,
+            'engine'
+          )
+        )
+      }),
+    [store]
+  )
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

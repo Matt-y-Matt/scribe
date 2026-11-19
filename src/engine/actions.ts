@@ -269,6 +269,8 @@ export interface NewCard {
    * links to the highlight, not to the moment it was marked. Default: now.
    */
   t_ms?: number
+  /** Ticked for the summary from the start: a card written after Stop. */
+  confirmed?: boolean
 }
 
 /** A card someone adds by hand. It needs no segment: a person vouches for it. */
@@ -293,7 +295,7 @@ export function addCard(
     status: 'accepted',
     source,
     created_t_ms: card.t_ms ?? store.now,
-    confirmed: false,
+    confirmed: card.confirmed ?? false,
     order_key: nextOrder(cardsIn(state, topic.id)),
   }
   store.commit('add_card', source, [

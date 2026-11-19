@@ -58,6 +58,7 @@ function Banners() {
   const notStarted = useStore(session, state => state.notStarted)
   const micLost = useStore(session, state => state.micLost)
   const modelMissing = useStore(session, state => state.modelMissing)
+  const notesOff = useStore(session, state => state.notesOff)
   const review = useStore(session, state => state.review)
   if (review) return null
 
@@ -105,6 +106,18 @@ function Banners() {
           >
             Audio settings
           </Button>
+        </Banner>
+      )}
+      {notesOff && !modelMissing && (
+        <Banner>
+          <span className="min-w-0 flex-1">
+            <strong className="font-semibold">
+              The map is not being written.
+            </strong>{' '}
+            The model on this PC (Ollama) is not answering. The meeting is still
+            recorded and transcribed, and the cards catch up as soon as it
+            answers.
+          </span>
         </Banner>
       )}
       {modelMissing && (

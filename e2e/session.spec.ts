@@ -323,6 +323,16 @@ test.describe('states', () => {
     await expect(waveform(page).locator('canvas').first()).toBeVisible()
   })
 
+  test('with the local model silent the screen says the map is behind', async ({
+    page,
+  }) => {
+    await open(page, 'notes-off')
+    await expect(page.getByText('The map is not being written.')).toBeVisible()
+    await expect(indicator(page)).toContainText('REC')
+    // The transcript carries on.
+    await expect(transcript(page).getByRole('listitem').first()).toBeVisible()
+  })
+
   test('paused: the indicator is grey text and one click from recording', async ({
     page,
   }) => {

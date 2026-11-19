@@ -35,7 +35,7 @@ export function CardEditor({
   topicId: string
   onDone: () => void
 }) {
-  const { store, state, notify } = useLive()
+  const { store, state, notify, session } = useLive()
   const [text, setText] = useState(card?.text ?? '')
   const [kind, setKind] = useState<CardKind>(card?.kind ?? 'note')
   const [owner, setOwner] = useState(card?.owner ?? '')
@@ -65,7 +65,14 @@ export function CardEditor({
       due_text: due.trim() || null,
     }
     if (card) editCard(store, card.id, fields)
-    else addCard(store, topicId, fields)
+    // A card the host writes once the meeting is over is one they vouch
+    // for: it is in the summary unless they untick it.
+    else {
+      addCard(store, topicId, {
+        ...fields,
+        confirmed: session.getState().review,
+      })
+    }
     onDone()
   }
 
