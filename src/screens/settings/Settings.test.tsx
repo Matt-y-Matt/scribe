@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ModelDownload } from '@/ipc'
 import { BackendContext, type Backend } from '@/lib/backend'
@@ -102,7 +102,8 @@ describe('Settings, Appearance', () => {
 describe('Settings, Speech', () => {
   it('shows each model with its size and licence, and which are installed', async () => {
     show('speech')
-    const rows = await screen.findAllByRole('listitem')
+    const live = await screen.findByRole('list', { name: 'Live transcription' })
+    const rows = within(live).getAllByRole('listitem')
     expect(rows).toHaveLength(2)
     expect(rows[0]).toHaveTextContent('Parakeet-TDT 0.6B v3')
     expect(rows[0]).toHaveTextContent('671 MB · CC-BY-4.0')
@@ -112,6 +113,18 @@ describe('Settings, Speech', () => {
     expect(
       screen.getByRole('radio', { name: 'Use Whisper large-v3-turbo' })
     ).toBeDisabled()
+  })
+
+  it('offers the clean-up model on its own, not as a live choice', async () => {
+    show('speech')
+    const cleanup = await screen.findByRole('list', { name: 'Clean-up' })
+    expect(within(cleanup).getByRole('listitem')).toHaveTextContent(
+      'Qwen3-ASR 0.6B'
+    )
+    expect(within(cleanup).queryByRole('radio')).toBeNull()
+    expect(
+      within(cleanup).getByRole('button', { name: 'Download' })
+    ).toBeVisible()
   })
 
   it('starts a download, shows its progress, and can cancel it', async () => {
@@ -130,7 +143,8 @@ describe('Settings, Speech', () => {
         },
       }
     )
-    fireEvent.click(await screen.findByRole('button', { name: 'Download' }))
+    const live = await screen.findByRole('list', { name: 'Live transcription' })
+    fireEvent.click(within(live).getByRole('button', { name: 'Download' }))
     expect(downloadModel).toHaveBeenCalledWith('whisper-large-v3-turbo-int8')
 
     const event = {

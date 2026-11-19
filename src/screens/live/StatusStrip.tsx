@@ -221,6 +221,38 @@ function AddHeader() {
 }
 
 /**
+ * A finished meeting's transcript, heard again by the clean-up model. It
+ * runs by itself after Stop; a meeting recorded before the model was on
+ * this PC gets the button.
+ */
+function Cleanup() {
+  const { session, actions } = useLive()
+  const cleaning = useStore(session, store => store.cleaning)
+  const ready = useStore(
+    session,
+    store => store.cleanupModel && !store.cleaned && store.segments.length > 0
+  )
+  if (cleaning) {
+    return (
+      <span role="status" className="text-secondary text-text-muted">
+        Cleaning the transcript: line {cleaning.done} of {cleaning.of}
+      </span>
+    )
+  }
+  if (!ready) return null
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      title="Hear the recording again with the second speech model, which hears whole sentences better. Takes several minutes."
+      onClick={actions.cleanTranscript}
+    >
+      Clean transcript
+    </Button>
+  )
+}
+
+/**
  * A finished meeting's notes, written again from its transcript. It replaces
  * what the model wrote, so it asks first, in place.
  */
@@ -228,6 +260,7 @@ function Rebuild() {
   const { session, actions } = useLive()
   const rebuilding = useStore(session, store => store.rebuilding)
   const lines = useStore(session, store => store.segments.length)
+  const cleaning = useStore(session, store => store.cleaning !== null)
   const [asking, setAsking] = useState(false)
 
   if (rebuilding) {
@@ -260,8 +293,12 @@ function Rebuild() {
     <Button
       variant="outline"
       size="sm"
-      disabled={lines === 0}
-      title="Have the model on this PC write this meeting's notes again from the transcript"
+      disabled={lines === 0 || cleaning}
+      title={
+        cleaning
+          ? 'Once the transcript is cleaned up'
+          : "Have the model on this PC write this meeting's notes again from the transcript"
+      }
       onClick={() => setAsking(true)}
     >
       Rebuild notes
@@ -297,6 +334,7 @@ export function StatusStrip() {
           Summary
         </Button>
       )}
+      {review && <Cleanup />}
       {review && <Rebuild />}
 
       <nav

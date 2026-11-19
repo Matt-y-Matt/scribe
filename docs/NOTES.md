@@ -177,7 +177,14 @@ Matt asked whether Qwen3-ASR, which Handy uses for his dictation, hears better t
 - **Speed: Qwen3 is 3.5 to 4 times slower.** At 4 threads on an idle PC, real-time factor 0.70 (system audio) and 0.98 (microphone) against Parakeet's 0.20 and 0.27. During the call Parakeet itself ran at 0.63 with Ollama busy, so Qwen3 would fall behind live.
 - Handy's case differs: dictation is one person, close to the microphone, in whole sentences, which is where Qwen3 is strong.
 
-Not decided: Matt's call. The way it could fit is Parakeet live and a Qwen3 pass over the recording after Stop, keeping Parakeet's line where Qwen3's is short or not in Latin script, so the notes and summary read the better transcript.
+Matt chose (2026-11-20, "Yes, build it"): Parakeet live, and a Qwen3 pass over the recording after Stop.
+
+## The transcript clean-up after Stop (2026-11-20)
+
+- **The model** is in the catalogue as `qwen3-asr-0.6b-int8` (987 MB, Apache-2.0 upstream at QwenLM/Qwen3-ASR), downloaded from Hugging Face `csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25` at a pinned commit like the others, every file checked by SHA-256. Its tokenizer is a folder of three files, so the downloader now makes folders inside a model's. It is marked not live: Settings → Speech lists it under "Clean-up after the meeting", with no radio.
+- **The pass** (`session/cleanup.rs`, command `clean_transcript`, event `transcript:cleanup`): every line of the transcript is heard again from the recording, at the live line's own times plus 150 ms either side. The new text replaces the old only when the line is at least 2 s long, the new text has no Chinese, Japanese or Korean characters, and it has no more than 5 words a second plus 2. Spelled-out letters are joined ("S V G" → "SVG", "P N G P D F" → "PNG PDF"). Lines keep their ids and times, so cards still point at them; the old text is kept in `segments.live_text` (migration 3), and the meeting gets `cleaned_at_ms`. Refused while a meeting is recording.
+- **When it runs:** by itself the moment a meeting stops, if the model is installed. The end screen says how far it has got, and the written summary waits for it. A meeting recorded before the model was installed has a **Clean transcript** button in its status strip; once cleaned, **Rebuild notes** writes the map again from the cleaner text.
+- **A bug it turned up:** the first open of a database after migration 3 crashed reading `SELECT * FROM segments` (sqlx: "the len is 9 but the index is 9"). The segment and meeting queries now name their columns.
 
 ## After M2 — the screens around a meeting (2026-11-19)
 

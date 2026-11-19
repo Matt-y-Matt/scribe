@@ -8,8 +8,8 @@ pub mod models;
 use std::path::Path;
 
 use sherpa_onnx::{
-    OfflineRecognizer, OfflineRecognizerConfig, OfflineTransducerModelConfig,
-    OfflineWhisperModelConfig,
+    OfflineQwen3ASRModelConfig, OfflineRecognizer, OfflineRecognizerConfig,
+    OfflineTransducerModelConfig, OfflineWhisperModelConfig,
 };
 
 use crate::audio::SAMPLE_RATE;
@@ -87,6 +87,19 @@ impl LocalSherpa {
                     ..Default::default()
                 };
                 config.model_config.tokens = file("turbo-tokens.txt");
+            }
+            Engine::Qwen3 => {
+                config.model_config.qwen3_asr = OfflineQwen3ASRModelConfig {
+                    conv_frontend: file("conv_frontend.onnx"),
+                    encoder: file("encoder.int8.onnx"),
+                    decoder: file("decoder.int8.onnx"),
+                    tokenizer: file("tokenizer"),
+                    // An utterance is at most 30 s: well under this.
+                    max_new_tokens: 512,
+                    ..Default::default()
+                };
+                // The tokenizer folder stands in for a tokens file.
+                config.model_config.tokens = Some(String::new());
             }
         }
         config.model_config.num_threads = threads;

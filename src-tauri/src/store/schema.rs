@@ -167,4 +167,11 @@ CREATE TABLE settings (
     r#"
 ALTER TABLE cards ADD COLUMN done_at_ms INTEGER;
 "#,
+    // 3 — the transcript cleaned up after Stop by a second speech model:
+    // what the live model heard is kept beside the line that replaced it,
+    // and the meeting remembers when it was cleaned.
+    r#"
+ALTER TABLE segments ADD COLUMN live_text TEXT;
+ALTER TABLE meetings ADD COLUMN cleaned_at_ms INTEGER;
+"#,
 ];

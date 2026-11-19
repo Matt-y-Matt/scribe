@@ -2,6 +2,8 @@
 
 One line per decision, newest first. Format: `YYYY-MM-DD — decision — why — who`.
 
+- 2026-11-20 — Parakeet stays the live speech model; Qwen3-ASR 0.6B cleans the transcript up after Stop, replacing a line only when it is at least 2 s long, in Latin script and not longer than 5 words a second allow. The live text is kept in `segments.live_text` — on the Edwin call Qwen3 heard whole sentences better ("Chinese New Year", "Indo side", "tech, lah") but invented text on about a quarter of the clips under 2 s and ran at 0.7–1.0 of real time against Parakeet's 0.2 — Matt: "Yes, build it"
+- 2026-11-20 — Store queries on `segments` and `meetings` name their columns instead of `SELECT *` — after migration 3 a pooled connection read a column the row did not have and sqlx panicked — Claude
 - 2026-11-20 — Off the agenda, each topic is a column of its own, side by side in the order they came up; agenda columns keep their topics stacked. With no agenda the area is titled "Topics" and nothing is marked off-agenda — Matt: new topics should come out next to it, not below, so the whiteboard slowly fills up; nothing is to the right of that area, so a new topic moves nothing — Matt
 - 2026-11-20 — A second hue, `--aside` (violet), marks the off-agenda area, pin suggestions and pinned markers; UI_SPEC §1 has one accent — Matt asked for a different colour for pinned and out-of-scope topics; the grey of `--pin` did not set them apart — Matt
 - 2026-11-20 — Cards collapse to counts below zoom 0.5, not 0.7 (UI_SPEC §2.2); a click on a collapsed topic zooms to it at 0.9 — the map opens at 0.8, so one wheel notch emptied every topic; text is past reading at 0.5 — Claude, on Matt's report
@@ -135,6 +137,7 @@ Licence as declared in the npm or crates.io registry on the day the dependency w
 | Dev only: tsx, vitest, jsdom, @testing-library/react, @testing-library/jest-dom, eslint, @eslint/js, typescript-eslint, eslint-plugin-react, eslint-plugin-react-hooks, eslint-plugin-react-compiler, eslint-plugin-react-refresh, eslint-config-prettier, prettier, @types/node, @types/react, @types/react-dom | MIT | M0 |
 | lucide-react (card-kind and control icons) | ISC | M1 |
 | sherpa-onnx (official bindings; they download and link the sherpa-onnx libraries, which contain ONNX Runtime, MIT) | Apache-2.0 | M2 |
+| Qwen3-ASR 0.6B (speech model, downloaded on request, not shipped; sherpa-onnx export `csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25`) | Apache-2.0 (upstream QwenLM/Qwen3-ASR) | after M2 |
 | Anarlog crates `audio-actual`, `aec`, `vad`, `audio`, `audio-device`, `audio-interface`, `audio-sync`, `audio-utils`, `resampler`, `onnx` (vendored at `9c1cbe2`; notice in `crates/vendor/anarlog/LICENSE`), with the Silero VAD v6.2 model and the two echo-cancellation models they embed | MIT | M2 |
 | Dependencies of the vendored crates: ort (downloads ONNX Runtime, MIT), ndarray, rodio, dasp, ringbuf, anyhow, pin-project, windows, windows-core | MIT OR Apache-2.0 | M2 |
 | Dependencies of the vendored crates: wasapi, rubato, realfft, ebur128, audioadapter-buffers, tokio-stream, tracing | MIT | M2 |

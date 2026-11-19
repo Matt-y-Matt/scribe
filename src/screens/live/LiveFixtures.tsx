@@ -45,6 +45,7 @@ function fixtureScreen(
             agenda: [],
             participants: [...store.getState().meeting.participants],
             loopback: false,
+            cleaned: false,
           },
         ],
       })

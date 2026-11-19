@@ -97,6 +97,8 @@ pub struct MeetingInfo {
     pub participants: Vec<String>,
     /// Whether system audio was recorded as well as the microphone.
     pub loopback: bool,
+    /// The transcript has been cleaned up by the second speech model.
+    pub cleaned: bool,
 }
 
 /// A meeting's written summary, and the instruction it was written to
@@ -254,6 +256,14 @@ fn wall(row: &SqliteRow, column: &str) -> Result<Option<f64>> {
         .map(|value| value as f64))
 }
 
+// Queries name their columns. `SELECT *` on a pool connection that was open
+// across a migration which added a column read a column the row did not
+// have, and sqlx panicked (seen with migration 3, 2026-11-20).
+const SEGMENT_COLUMNS: &str =
+    "s.id, s.meeting_id, s.t0_ms, s.t1_ms, s.speaker_label, s.source, s.text, s.confidence";
+const MEETING_COLUMNS: &str = "id, title, created_at_ms, started_at_ms, ended_at_ms, duration_ms, \
+     mode, agenda_json, loopback, cleaned_at_ms";
+
 fn segment_from(row: &SqliteRow) -> Result<SegmentFinal> {
     Ok(SegmentFinal {
         id: row.try_get("id")?,
@@ -382,15 +392,18 @@ impl Store {
             agenda: list_from(row.try_get("agenda_json")?),
             participants,
             loopback: row.try_get::<i64, _>("loopback")? != 0,
+            cleaned: row.try_get::<Option<i64>, _>("cleaned_at_ms")?.is_some(),
             id,
         })
     }
 
     pub async fn meeting(&self, id: &str) -> Result<Option<MeetingInfo>> {
-        let row = sqlx::query("SELECT * FROM meetings WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await?;
+        let row = sqlx::query(&format!(
+            "SELECT {MEETING_COLUMNS} FROM meetings WHERE id = ?"
+        ))
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
         match row {
             Some(row) => Ok(Some(self.meeting_from(&row).await?)),
             None => Ok(None),
@@ -399,9 +412,11 @@ impl Store {
 
     /// Every meeting, newest first.
     pub async fn meetings(&self) -> Result<Vec<MeetingInfo>> {
-        let rows = sqlx::query("SELECT * FROM meetings ORDER BY created_at_ms DESC, id DESC")
-            .fetch_all(&self.pool)
-            .await?;
+        let rows = sqlx::query(&format!(
+            "SELECT {MEETING_COLUMNS} FROM meetings ORDER BY created_at_ms DESC, id DESC"
+        ))
+        .fetch_all(&self.pool)
+        .await?;
         let mut meetings = Vec::with_capacity(rows.len());
         for row in &rows {
             meetings.push(self.meeting_from(row).await?);
@@ -516,13 +531,40 @@ impl Store {
 
     /// A meeting's transcript in meeting order.
     pub async fn segments(&self, meeting_id: &str) -> Result<Vec<SegmentFinal>> {
-        sqlx::query("SELECT * FROM segments WHERE meeting_id = ? ORDER BY t0_ms, id")
+        sqlx::query(&format!(
+            "SELECT {SEGMENT_COLUMNS} FROM segments s WHERE s.meeting_id = ? ORDER BY s.t0_ms, s.id"
+        ))
+        .bind(meeting_id)
+        .fetch_all(&self.pool)
+        .await?
+        .iter()
+        .map(segment_from)
+        .collect()
+    }
+
+    /// Puts cleaned-up text in place of what the live model heard, keeping
+    /// the first text a line had in `live_text`, and marks the meeting
+    /// cleaned. All or nothing. Lines of other meetings are not touched.
+    pub async fn clean_segments(&self, meeting_id: &str, lines: &[(String, String)]) -> Result<()> {
+        let mut tx = self.pool.begin().await?;
+        for (id, text) in lines {
+            sqlx::query(
+                "UPDATE segments SET live_text = COALESCE(live_text, text), text = ? \
+                 WHERE id = ? AND meeting_id = ?",
+            )
+            .bind(text)
+            .bind(id)
             .bind(meeting_id)
-            .fetch_all(&self.pool)
-            .await?
-            .iter()
-            .map(segment_from)
-            .collect()
+            .execute(&mut *tx)
+            .await?;
+        }
+        sqlx::query("UPDATE meetings SET cleaned_at_ms = ? WHERE id = ?")
+            .bind(now_ms() as i64)
+            .bind(meeting_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
     }
 
     /// Where the transcript ends, or 0 when there is none: of the whole
@@ -549,11 +591,11 @@ impl Store {
         let Some(query) = fts_query(typed) else {
             return Ok(Vec::new());
         };
-        sqlx::query(
-            "SELECT s.* FROM segments_fts f JOIN segments s ON s.rowid = f.rowid \
+        sqlx::query(&format!(
+            "SELECT {SEGMENT_COLUMNS} FROM segments_fts f JOIN segments s ON s.rowid = f.rowid \
              WHERE segments_fts MATCH ?1 AND (?2 IS NULL OR s.meeting_id = ?2) \
-             ORDER BY f.rank, s.t0_ms LIMIT ?3",
-        )
+             ORDER BY f.rank, s.t0_ms LIMIT ?3"
+        ))
         .bind(query)
         .bind(meeting_id)
         .bind(limit)

@@ -50,6 +50,12 @@ export interface SessionState {
   lastTimeDone: readonly string[]
   /** The notes of a finished meeting being written again: lines read so far. */
   rebuilding: { done: number; of: number } | null
+  /** The clean-up speech model is on this PC. */
+  cleanupModel: boolean
+  /** The transcript has been cleaned up by it. */
+  cleaned: boolean
+  /** The transcript is being cleaned up: lines heard again so far. */
+  cleaning: { done: number; of: number } | null
 }
 
 export interface SessionActions {
@@ -81,6 +87,11 @@ export interface SessionActions {
    * the transcript again, with the note-taker as it is now.
    */
   rebuild(): void
+  /**
+   * A finished meeting: hear the transcript again with the clean-up model,
+   * which hears whole sentences better than the live one.
+   */
+  cleanTranscript(): void
 }
 
 export type SessionStore = StoreApi<SessionState>
@@ -109,6 +120,9 @@ export const emptySession = (
   lastTime: [],
   lastTimeDone: [],
   rebuilding: null,
+  cleanupModel: false,
+  cleaned: false,
+  cleaning: null,
 })
 
 export function createSessionStore(initial: SessionState): SessionStore {
@@ -160,4 +174,5 @@ export const idleActions: SessionActions = {
   showMap: noop,
   leave: noop,
   rebuild: noop,
+  cleanTranscript: noop,
 }

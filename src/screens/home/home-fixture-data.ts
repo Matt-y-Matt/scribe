@@ -29,6 +29,7 @@ const meeting = (
   agenda,
   participants: ['Matt', 'Zach', 'Ant', 'Kabs'],
   loopback: false,
+  cleaned: false,
 })
 
 export const FIXTURE_MEETINGS: MeetingInfo[] = [

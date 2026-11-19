@@ -30,6 +30,8 @@ pub struct AppState {
     pub playback: Playback,
     /// For the one local HTTP call the core makes: Ollama on this PC.
     pub http: reqwest::Client,
+    /// The meeting whose transcript is being cleaned up, if one is.
+    pub cleaning: Arc<tokio::sync::Mutex<Option<String>>>,
 }
 
 /// Sends the session's news to the webview as typed Tauri events.
@@ -143,6 +145,7 @@ impl AppState {
             downloads: Arc::default(),
             playback,
             http: reqwest::Client::new(),
+            cleaning: Arc::default(),
         })
     }
 }

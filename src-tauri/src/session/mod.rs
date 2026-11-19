@@ -7,6 +7,7 @@
 //! processed, so it stops while paused and a segment's times always match the
 //! audio files.
 
+pub mod cleanup;
 pub mod recovery;
 
 use std::fs::File;

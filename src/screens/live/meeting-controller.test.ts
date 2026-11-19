@@ -7,6 +7,7 @@ import type {
   PlaybackState,
   RecordingState,
   SegmentFinal,
+  TranscriptCleanup,
 } from '@/ipc'
 import { addCard, addTopic } from '@/engine/actions'
 import { BackendError, type Backend } from '@/lib/backend'
@@ -27,6 +28,7 @@ const meeting = (patch: Partial<MeetingInfo> = {}): MeetingInfo => ({
   agenda: ['A', 'B', 'C'],
   participants: ['Matt', 'Kabs'],
   loopback: false,
+  cleaned: false,
   ...patch,
 })
 
@@ -437,6 +439,89 @@ describe('openMeeting', () => {
     expect(asked.join('\n')).toContain('Matt: w1x0')
     expect(asked.join('\n')).toContain('Zach: w3x0')
     expect(asked.join('\n')).toContain('THIS IS A LIVE TRANSCRIPT')
+  })
+
+  describe('the transcript clean-up', () => {
+    const withCleanup = FIXTURE_MODELS.map(model => ({
+      ...model,
+      installed: model.installed || !model.live,
+    }))
+
+    it('runs when the meeting stops, and reads the cleaned lines back', async () => {
+      let report: (event: TranscriptCleanup) => void = () => undefined
+      let finish: () => void = () => undefined
+      const cleanTranscript = vi.fn<Backend['cleanTranscript']>(
+        () =>
+          new Promise(done => {
+            finish = () => done({ meeting_id: 'm_1', lines: 2, changed: 1 })
+          })
+      )
+      let cleanedYet = false
+      const { backend, say } = core(meeting(), {
+        listModels: async () => withCleanup,
+        cleanTranscript,
+        onTranscriptCleanup: listener => ((report = listener), () => undefined),
+        getSegments: async () =>
+          cleanedYet
+            ? [segment('s_1', 0, 'Chinese New Year'), segment('s_2', 4_000)]
+            : [],
+      })
+      const running = await open(backend)
+      expect(running.session.getState().cleanupModel).toBe(true)
+      say.segment(segment('s_1', 0, 'high cost chin years'))
+      say.segment(segment('s_2', 4_000))
+      expect(cleanTranscript).not.toHaveBeenCalled()
+
+      say.state({
+        meeting_id: 'm_1',
+        state: 'stopped',
+        elapsed_ms: 9_000,
+        transcribing: true,
+      })
+      expect(cleanTranscript).toHaveBeenCalledWith('m_1')
+      expect(running.session.getState().cleaning).toEqual({ done: 0, of: 2 })
+      report({ meeting_id: 'm_1', done: 1, total: 2 })
+      // Another meeting's progress is not this one's.
+      report({ meeting_id: 'm_other', done: 9, total: 9 })
+      expect(running.session.getState().cleaning).toEqual({ done: 1, of: 2 })
+
+      cleanedYet = true
+      finish()
+      await vi.waitFor(() =>
+        expect(running.session.getState().cleaning).toBeNull()
+      )
+      expect(running.session.getState()).toMatchObject({ cleaned: true })
+      expect(running.session.getState().segments[0]?.text).toBe(
+        'Chinese New Year'
+      )
+
+      // Once is enough.
+      running.actions.cleanTranscript()
+      expect(cleanTranscript).toHaveBeenCalledTimes(1)
+    })
+
+    it('does nothing without the clean-up model, and gives up quietly on a failure', async () => {
+      const cleanTranscript = vi.fn<Backend['cleanTranscript']>(async () => {
+        throw new BackendError({ kind: 'busy' })
+      })
+      const { backend, say } = core(meeting(), { cleanTranscript })
+      const running = await open(backend)
+      say.segment(segment('s_1', 0))
+      say.state({
+        meeting_id: 'm_1',
+        state: 'stopped',
+        elapsed_ms: 9_000,
+        transcribing: true,
+      })
+      expect(cleanTranscript).not.toHaveBeenCalled()
+
+      running.session.setState({ cleanupModel: true })
+      running.actions.cleanTranscript()
+      await vi.waitFor(() =>
+        expect(running.session.getState().cleaning).toBeNull()
+      )
+      expect(running.session.getState().cleaned).toBe(false)
+    })
   })
 
   it('saves a highlight and plays through the core', async () => {

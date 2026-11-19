@@ -120,7 +120,8 @@ function ModelRow({
   model: ModelInfo
   download: ModelDownload | undefined
   selected: boolean
-  onSelect: () => void
+  /** Null for a model that is not chosen: it is used whenever installed. */
+  onSelect: (() => void) | null
 }) {
   const backend = useBackend()
   const running = (download && !download.done) || model.downloading
@@ -130,15 +131,17 @@ function ModelRow({
   return (
     <li className="flex flex-col gap-2 rounded-md border p-3">
       <div className="flex items-start gap-3">
-        <input
-          type="radio"
-          name="speech-model"
-          aria-label={`Use ${model.title}`}
-          checked={selected}
-          disabled={!model.installed}
-          onChange={onSelect}
-          className="mt-1 size-3.5 accent-accent"
-        />
+        {onSelect && (
+          <input
+            type="radio"
+            name="speech-model"
+            aria-label={`Use ${model.title}`}
+            checked={selected}
+            disabled={!model.installed}
+            onChange={onSelect}
+            className="mt-1 size-3.5 accent-accent"
+          />
+        )}
         <div className="min-w-0 flex-1">
           <h3 className="text-body font-semibold">{model.title}</h3>
           <p className="text-secondary text-text-muted">{model.languages}</p>
@@ -237,18 +240,48 @@ function Speech() {
         Speech is transcribed on this PC. A model is downloaded once from
         Hugging Face and checked before it is used.
       </p>
-      <ul className="flex flex-col gap-2">
-        {models.data.map(model => (
-          <ModelRow
-            key={model.id}
-            model={model}
-            download={downloads[model.id]}
-            selected={model.id === modelId}
-            onSelect={() => change({ modelId: model.id })}
-          />
-        ))}
+      <ul aria-label="Live transcription" className="flex flex-col gap-2">
+        {models.data
+          .filter(model => model.live)
+          .map(model => (
+            <ModelRow
+              key={model.id}
+              model={model}
+              download={downloads[model.id]}
+              selected={model.id === modelId}
+              onSelect={() => change({ modelId: model.id })}
+            />
+          ))}
       </ul>
-      {models.data.every(model => !model.installed) && (
+      {models.data.some(model => !model.live) && (
+        <>
+          <h3 className="text-secondary font-semibold">
+            Clean-up after the meeting
+          </h3>
+          <p className="text-secondary text-text-muted">
+            Too slow to keep up live, but it hears whole sentences better. Once
+            installed, it goes over every meeting&rsquo;s transcript after Stop,
+            which takes several minutes; the live text is kept where it does
+            better.
+          </p>
+          <ul aria-label="Clean-up" className="flex flex-col gap-2">
+            {models.data
+              .filter(model => !model.live)
+              .map(model => (
+                <ModelRow
+                  key={model.id}
+                  model={model}
+                  download={downloads[model.id]}
+                  selected={false}
+                  onSelect={null}
+                />
+              ))}
+          </ul>
+        </>
+      )}
+      {models.data
+        .filter(model => model.live)
+        .every(model => !model.installed) && (
         <p role="status" className="text-secondary text-text-muted">
           Without a model a meeting is still recorded, with no transcript.
         </p>

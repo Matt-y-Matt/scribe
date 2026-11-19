@@ -19,6 +19,9 @@ pub enum Engine {
     Parakeet,
     /// OpenAI Whisper: encoder, decoder.
     Whisper,
+    /// Alibaba Qwen3-ASR: a convolutional front end, an encoder, and a
+    /// language-model decoder with its tokenizer.
+    Qwen3,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +42,9 @@ pub struct ModelSpec {
     pub repo: &'static str,
     pub revision: &'static str,
     pub files: &'static [ModelFile],
+    /// Fast enough to keep up with a meeting on the reference PC. A model
+    /// that is not cleans the transcript up after Stop instead.
+    pub live: bool,
 }
 
 impl ModelSpec {
@@ -79,6 +85,7 @@ pub const CATALOGUE: &[ModelSpec] = &[
                 sha256: "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d",
             },
         ],
+        live: true,
     },
     ModelSpec {
         id: "whisper-large-v3-turbo-int8",
@@ -105,10 +112,59 @@ pub const CATALOGUE: &[ModelSpec] = &[
                 sha256: "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126",
             },
         ],
+        live: true,
+    },
+    // Hears whole sentences better than Parakeet on a real call, but makes
+    // things up on short clips and runs at 0.7 to 1.0 of real time on the
+    // reference PC: it cleans the transcript after Stop (docs/NOTES.md,
+    // 2026-11-20).
+    ModelSpec {
+        id: "qwen3-asr-0.6b-int8",
+        title: "Qwen3-ASR 0.6B",
+        engine: Engine::Qwen3,
+        languages: "52 languages and dialects, English and Chinese best",
+        licence: "Apache-2.0",
+        repo: "csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25",
+        revision: "68818b2313fe77bd06f6a7c5068ff3ef59d02b8a",
+        files: &[
+            ModelFile {
+                name: "conv_frontend.onnx",
+                bytes: 44_148_281,
+                sha256: "d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e",
+            },
+            ModelFile {
+                name: "encoder.int8.onnx",
+                bytes: 182_491_662,
+                sha256: "60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9",
+            },
+            ModelFile {
+                name: "decoder.int8.onnx",
+                bytes: 755_914_231,
+                sha256: "4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771",
+            },
+            ModelFile {
+                name: "tokenizer/merges.txt",
+                bytes: 1_671_853,
+                sha256: "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+            },
+            ModelFile {
+                name: "tokenizer/tokenizer_config.json",
+                bytes: 12_487,
+                sha256: "4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c",
+            },
+            ModelFile {
+                name: "tokenizer/vocab.json",
+                bytes: 2_776_833,
+                sha256: "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+            },
+        ],
+        live: false,
     },
 ];
 
 pub const DEFAULT_MODEL: &str = CATALOGUE[0].id;
+/// The model that cleans a meeting's transcript up after Stop.
+pub const CLEANUP_MODEL: &str = CATALOGUE[2].id;
 
 pub fn spec(id: &str) -> Option<&'static ModelSpec> {
     CATALOGUE.iter().find(|spec| spec.id == id)
@@ -254,6 +310,10 @@ impl Downloader {
         on_bytes: &mut impl FnMut(u64),
     ) -> Result<(), DownloadError> {
         let part = part_path(dir, file);
+        // A file may sit in a folder of the model's (`tokenizer/vocab.json`).
+        if let Some(folder) = part.parent() {
+            tokio::fs::create_dir_all(folder).await?;
+        }
         let mut have = tokio::fs::metadata(&part)
             .await
             .map(|meta| meta.len())
@@ -351,6 +411,7 @@ mod tests {
             repo: "owner/repo",
             revision: "abc",
             files,
+            live: true,
         }
     }
 
@@ -441,6 +502,13 @@ mod tests {
         assert_eq!(CATALOGUE[0].engine, Engine::Parakeet);
         assert_eq!(CATALOGUE[1].engine, Engine::Whisper);
         assert_eq!(DEFAULT_MODEL, "parakeet-tdt-0.6b-v3-int8");
+        // The clean-up model is not offered for live use.
+        assert_eq!(
+            spec(CLEANUP_MODEL).map(|spec| spec.engine),
+            Some(Engine::Qwen3)
+        );
+        assert!(!spec(CLEANUP_MODEL).unwrap().live);
+        assert!(CATALOGUE[0].live);
         for spec in CATALOGUE {
             assert_eq!(spec.revision.len(), 40, "{}: pin a full commit", spec.id);
             for file in spec.files {
@@ -489,6 +557,33 @@ mod tests {
         );
         assert_eq!(
             std::fs::read(model_dir(&data, &spec).join("model.bin")).unwrap(),
+            BODY
+        );
+        std::fs::remove_dir_all(data).unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_file_in_a_folder_of_the_model_lands_in_that_folder() {
+        let server = serve(BODY, false).await;
+        let data = temp_dir("nested");
+        let files: &'static [ModelFile] = Box::leak(Box::new([ModelFile {
+            name: "tokenizer/vocab.json",
+            bytes: BODY.len() as u64,
+            sha256: Box::leak(body_sha().into_boxed_str()),
+        }]));
+        let spec = ModelSpec {
+            files,
+            ..test_spec("")
+        };
+
+        downloader(&server)
+            .download(&spec, &data, &CancellationToken::new(), |_| {})
+            .await
+            .unwrap();
+
+        assert!(is_installed(&data, &spec));
+        assert_eq!(
+            std::fs::read(model_dir(&data, &spec).join("tokenizer").join("vocab.json")).unwrap(),
             BODY
         );
         std::fs::remove_dir_all(data).unwrap();

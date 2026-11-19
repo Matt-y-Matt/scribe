@@ -15,10 +15,11 @@ use tokio_util::sync::CancellationToken;
 
 use crate::audio::playback::PlaybackState;
 use crate::audio::SourceKind;
+use crate::session::cleanup::{self, Cleaned};
 use crate::session::recovery::{self, Recovered};
 use crate::session::{
-    audio_dir, peaks_path, AudioLevels, AudioPeaks, CaptureStatus, RecordingState, SessionError,
-    StartOptions,
+    audio_dir, peaks_path, AudioLevels, AudioPeaks, CaptureStatus, RecState, RecordingState,
+    SessionError, StartOptions,
 };
 use crate::state::AppState;
 use crate::store::{Highlight, MapPatch, MapRows, MeetingInfo, NewMeeting, OpenAction, Summary};
@@ -63,7 +64,17 @@ macro_rules! event {
     };
 }
 
+/// `transcript:cleanup` — progress of the clean-up pass over a finished
+/// meeting's transcript: lines heard again so far, of how many.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct TranscriptCleanup {
+    pub meeting_id: String,
+    pub done: u32,
+    pub total: u32,
+}
+
 event!(SegmentFinal, "segment:final");
+event!(TranscriptCleanup, "transcript:cleanup");
 event!(RecordingState, "recording:state");
 event!(AudioLevels, "audio:levels");
 event!(AudioPeaks, "audio:peaks");
@@ -91,6 +102,8 @@ pub enum AppError {
     Storage(String),
     #[error("the local AI did not answer: {0}")]
     LocalAi(String),
+    #[error("the speech model is not installed")]
+    ModelMissing,
 }
 
 impl From<SessionError> for AppError {
@@ -382,6 +395,8 @@ pub struct ModelInfo {
     pub installed: bool,
     /// A download of this model is running.
     pub downloading: bool,
+    /// Fast enough for a live meeting; otherwise it cleans up after Stop.
+    pub live: bool,
 }
 
 #[tauri::command]
@@ -398,6 +413,7 @@ pub async fn list_models(state: State<'_, AppState>) -> CommandResult<Vec<ModelI
             bytes: spec.total_bytes() as f64,
             installed: models::is_installed(&state.data_dir, spec),
             downloading: downloading.contains_key(spec.id),
+            live: spec.live,
         })
         .collect())
 }
@@ -493,6 +509,66 @@ pub async fn search_segments(
         .store
         .search_segments(meeting_id.as_deref(), &query, 200)
         .await?)
+}
+
+/// Hears a finished meeting's transcript again with the clean-up model and
+/// saves the lines it heard better (session/cleanup.rs). Takes minutes:
+/// `transcript:cleanup` events carry the progress. Refused while a meeting
+/// is being recorded, which needs the processor more, and while another
+/// clean-up is running.
+#[tauri::command]
+#[specta::specta]
+pub async fn clean_transcript(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    meeting_id: String,
+) -> CommandResult<Cleaned> {
+    let recording = state.session.state().await;
+    if matches!(recording.state, RecState::Recording | RecState::Paused) {
+        return Err(AppError::Busy);
+    }
+    let meeting = state
+        .store
+        .meeting(&meeting_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    if meeting.is_unfinished() {
+        return Err(AppError::Busy);
+    }
+    let transcriber =
+        (state.deps.transcriber)(models::CLEANUP_MODEL).map_err(|_| AppError::ModelMissing)?;
+    {
+        let mut running = state.cleaning.lock().await;
+        if running.is_some() {
+            return Err(AppError::Busy);
+        }
+        *running = Some(meeting_id.clone());
+    }
+    let last = std::sync::Mutex::new(Instant::now() - Duration::from_secs(1));
+    let id = meeting_id.clone();
+    let progress_app = app.clone();
+    let result = cleanup::clean(
+        &state.store,
+        &state.data_dir,
+        &meeting_id,
+        transcriber,
+        move |done, total| {
+            let mut last = last.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+            // At most two events a second, and always the last one.
+            if done == total || last.elapsed() >= Duration::from_millis(500) {
+                *last = Instant::now();
+                let _ = TranscriptCleanup {
+                    meeting_id: id.clone(),
+                    done,
+                    total,
+                }
+                .emit(&progress_app);
+            }
+        },
+    )
+    .await;
+    *state.cleaning.lock().await = None;
+    result.map_err(AppError::Storage)
 }
 
 // ---- the map ----------------------------------------------------------------
@@ -687,6 +763,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             cancel_download,
             get_segments,
             search_segments,
+            clean_transcript,
             map_load,
             map_save,
             get_peaks,
@@ -708,6 +785,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             CaptureStatus,
             ModelDownload,
             PlaybackState,
+            TranscriptCleanup,
         ])
 }
 

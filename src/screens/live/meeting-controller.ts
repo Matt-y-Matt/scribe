@@ -93,6 +93,8 @@ export async function openMeeting(
     segments,
     peaks,
     highlights,
+    cleanupModel: models.some(model => !model.live && model.installed),
+    cleaned: meeting.cleaned,
     // A meeting being held, not one being read: what is still owed from
     // the earlier meetings of the same name.
     lastTime:
@@ -164,6 +166,38 @@ export async function openMeeting(
     }
   }
 
+  // The transcript heard again by the clean-up model (session/cleanup.rs in
+  // the core), then read back so the screen, the summary and a rebuild of
+  // the notes all use it.
+  const cleanTranscript = async () => {
+    const now = session.getState()
+    if (now.cleaning || now.cleaned || !now.cleanupModel) return
+    if (now.segments.length === 0) return
+    session.setState({ cleaning: { done: 0, of: now.segments.length } })
+    const unlisten = backend.onTranscriptCleanup(event => {
+      if (mine(event.meeting_id)) {
+        session.setState({ cleaning: { done: event.done, of: event.total } })
+      }
+    })
+    try {
+      await backend.cleanTranscript(meetingId)
+      session.setState({
+        segments: await backend.getSegments(meetingId),
+        cleaned: true,
+      })
+    } finally {
+      unlisten()
+      session.setState({ cleaning: null })
+    }
+  }
+  const cleanQuietly = () => {
+    cleanTranscript().catch((error: unknown) =>
+      logger.error('the transcript could not be cleaned up', {
+        reason: reasonOf(error),
+      })
+    )
+  }
+
   const stops = [
     backend.onSegment(segment => {
       if (mine(segment.meeting_id)) heard(segment)
@@ -171,6 +205,7 @@ export async function openMeeting(
     backend.onRecordingState(next => {
       if (!mine(next.meeting_id)) return
       const stopped = next.state === 'stopped'
+      const justStopped = stopped && session.getState().rec !== 'stopped'
       session.setState(state => ({
         rec: next.state,
         elapsedMs: next.elapsed_ms,
@@ -183,6 +218,9 @@ export async function openMeeting(
       }))
       if (stopped) structurer.end()
       else structurer.clock(next.elapsed_ms)
+      // The meeting is over: clean its transcript up while the host reads
+      // the end screen. The summary waits for it.
+      if (justStopped) cleanQuietly()
     }),
     backend.onLevels(levels => {
       const rms = (id: string) =>
@@ -286,6 +324,7 @@ export async function openMeeting(
       session.setState({ view: 'wrap' })
     },
     showMap: () => session.setState({ view: 'map' }),
+    cleanTranscript: cleanQuietly,
     rebuild: () => {
       rebuild().catch((error: unknown) =>
         logger.error('the notes could not be rebuilt', {

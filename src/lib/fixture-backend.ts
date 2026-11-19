@@ -25,6 +25,7 @@ export const FIXTURE_MODELS: ModelInfo[] = [
     bytes: 670_576_784,
     installed: true,
     downloading: false,
+    live: true,
   },
   {
     id: 'whisper-large-v3-turbo-int8',
@@ -34,6 +35,17 @@ export const FIXTURE_MODELS: ModelInfo[] = [
     bytes: 1_036_613_791,
     installed: false,
     downloading: false,
+    live: true,
+  },
+  {
+    id: 'qwen3-asr-0.6b-int8',
+    title: 'Qwen3-ASR 0.6B',
+    languages: '52 languages and dialects, English and Chinese best',
+    licence: 'Apache-2.0',
+    bytes: 987_015_347,
+    installed: false,
+    downloading: false,
+    live: false,
   },
 ]
 
@@ -100,6 +112,7 @@ export function fixtureBackend(overrides: Partial<FixtureData> = {}): Backend {
         agenda: request.agenda,
         participants: request.participants,
         loopback: false,
+        cleaned: false,
       }
       data.meetings = [row, ...data.meetings]
       return row
@@ -227,6 +240,11 @@ export function fixtureBackend(overrides: Partial<FixtureData> = {}): Backend {
     onCaptureStatus: () => nothing,
 
     getSegments: async meetingId => data.segments[meetingId] ?? [],
+    // No core, so no speech model: nothing to clean with.
+    cleanTranscript: async () => {
+      throw new BackendError({ kind: 'model_missing' })
+    },
+    onTranscriptCleanup: () => nothing,
     searchSegments: async (meetingId, query) => {
       const words = query.toLowerCase().split(/\s+/).filter(Boolean)
       if (words.length === 0) return []

@@ -218,6 +218,21 @@ async searchSegments(meetingId: string | null, query: string) : Promise<Result<S
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Hears a finished meeting's transcript again with the clean-up model and
+ * saves the lines it heard better (session/cleanup.rs). Takes minutes:
+ * `transcript:cleanup` events carry the progress. Refused while a meeting
+ * is being recorded, which needs the processor more, and while another
+ * clean-up is running.
+ */
+async cleanTranscript(meetingId: string) : Promise<Result<Cleaned, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("clean_transcript", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async mapLoad(meetingId: string) : Promise<Result<MapRows, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("map_load", { meetingId }) };
@@ -347,7 +362,8 @@ captureStatus: CaptureStatus,
 modelDownload: ModelDownload,
 playbackState: PlaybackState,
 recordingState: RecordingState,
-segmentFinal: SegmentFinal
+segmentFinal: SegmentFinal,
+transcriptCleanup: TranscriptCleanup
 }>({
 audioLevels: "audio:levels",
 audioPeaks: "audio:peaks",
@@ -355,7 +371,8 @@ captureStatus: "capture:status",
 modelDownload: "model:download",
 playbackState: "playback:state",
 recordingState: "recording:state",
-segmentFinal: "segment:final"
+segmentFinal: "segment:final",
+transcriptCleanup: "transcript:cleanup"
 })
 
 /** user-defined constants **/
@@ -367,7 +384,7 @@ segmentFinal: "segment:final"
 /**
  * Why a command failed, in a form the UI can act on.
  */
-export type AppError = { kind: "no_microphone" } | { kind: "capture"; detail: string } | { kind: "busy" } | { kind: "not_recording" } | { kind: "not_found" } | { kind: "already_recorded" } | { kind: "storage"; detail: string } | { kind: "local_ai"; detail: string }
+export type AppError = { kind: "no_microphone" } | { kind: "capture"; detail: string } | { kind: "busy" } | { kind: "not_recording" } | { kind: "not_found" } | { kind: "already_recorded" } | { kind: "storage"; detail: string } | { kind: "local_ai"; detail: string } | { kind: "model_missing" }
 /**
  * Name and version of the running app.
  */
@@ -404,6 +421,15 @@ export type CardStatus = "proposed" | "accepted" | "dismissed"
  * Who made a change to the map.
  */
 export type ChangeSource = "engine" | "user" | "scribe"
+export type Cleaned = { meeting_id: string; 
+/**
+ * Lines heard again.
+ */
+lines: number; 
+/**
+ * Lines whose text changed.
+ */
+changed: number }
 export type DeletedRow = { entity: MapEntity; id: string }
 export type Devices = { microphones: string[]; 
 /**
@@ -434,7 +460,11 @@ duration_ms: number; mode: MeetingMode; agenda: string[]; participants: string[]
 /**
  * Whether system audio was recorded as well as the microphone.
  */
-loopback: boolean }
+loopback: boolean; 
+/**
+ * The transcript has been cleaned up by the second speech model.
+ */
+cleaned: boolean }
 export type MeetingMode = "group" | "solo"
 /**
  * `model:download` — progress of a speech model download. Sizes are bytes,
@@ -453,7 +483,11 @@ export type ModelInfo = { id: string; title: string; languages: string; licence:
 /**
  * A download of this model is running.
  */
-downloading: boolean }
+downloading: boolean; 
+/**
+ * Fast enough for a live meeting; otherwise it cleans up after Stop.
+ */
+live: boolean }
 export type NewMeeting = { title: string; 
 /**
  * Agenda headers, in order.
@@ -540,6 +574,11 @@ export type Summary = { markdown: string | null; layout: string | null }
 export type TopicKind = "header" | "topic"
 export type TopicRow = { id: string; meeting_id: string; parent_id: string | null; title: string; kind: TopicKind; order_key: number; status: TopicStatus; off_agenda: boolean; created_t_ms: number; pinned_t_ms: number | null; revisited_t_ms: number | null; scheduled_t_ms: number | null; segment_ids: string[] }
 export type TopicStatus = "active" | "pinned" | "done"
+/**
+ * `transcript:cleanup` — progress of the clean-up pass over a finished
+ * meeting's transcript: lines heard again so far, of how many.
+ */
+export type TranscriptCleanup = { meeting_id: string; done: number; total: number }
 
 /** tauri-specta globals **/
 

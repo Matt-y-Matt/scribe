@@ -43,6 +43,7 @@ export function EndScreen({
   const elapsedMs = useStore(session, live => live.elapsedMs)
   const segments = useStore(session, live => live.segments)
   const loopback = useStore(session, live => live.loopback)
+  const cleaning = useStore(session, live => live.cleaning)
   const [readingBack, setReadingBack] = useState(false)
   // What was said, as the written summary reads it.
   const transcript = meetingTurns(
@@ -189,6 +190,7 @@ export function EndScreen({
                 state={state}
                 meta={meta}
                 transcript={transcript}
+                cleaning={cleaning}
                 initial={saved.data}
                 ask={body => backend.ollamaChat(body)}
                 saveAs={(fileName, text) => backend.saveTextAs(fileName, text)}

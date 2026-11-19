@@ -6,6 +6,7 @@ import {
   type AudioLevels,
   type AudioPeaks,
   type CaptureStatus,
+  type Cleaned,
   type Devices,
   type Highlight,
   type MapPatch,
@@ -21,6 +22,7 @@ import {
   type SegmentFinal,
   type StartOptions,
   type Summary,
+  type TranscriptCleanup,
 } from '@/ipc'
 
 // Everything the screens ask of the Rust core, behind one interface. The app
@@ -72,6 +74,13 @@ export interface Backend {
   onCaptureStatus(listener: (status: CaptureStatus) => void): Unlisten
 
   getSegments(meetingId: string): Promise<SegmentFinal[]>
+  /**
+   * Hears a finished meeting's transcript again with the clean-up model and
+   * saves the lines it heard better. Minutes long; rejects with `busy`
+   * while a meeting is recorded and `model_missing` without the model.
+   */
+  cleanTranscript(meetingId: string): Promise<Cleaned>
+  onTranscriptCleanup(listener: (event: TranscriptCleanup) => void): Unlisten
   /** `meetingId` null searches every meeting. */
   searchSegments(
     meetingId: string | null,
@@ -177,6 +186,8 @@ export const tauriBackend: Backend = {
   onCaptureStatus: listener => listen(events.captureStatus, listener),
 
   getSegments: meetingId => ok(commands.getSegments(meetingId)),
+  cleanTranscript: meetingId => ok(commands.cleanTranscript(meetingId)),
+  onTranscriptCleanup: listener => listen(events.transcriptCleanup, listener),
   searchSegments: (meetingId, query) =>
     ok(commands.searchSegments(meetingId, query)),
 

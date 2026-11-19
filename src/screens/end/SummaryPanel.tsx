@@ -51,6 +51,7 @@ export function SummaryPanel({
   ask,
   saveAs,
   transcript = [],
+  cleaning = null,
 }: {
   state: MapState
   meta: SummaryMeta
@@ -63,6 +64,11 @@ export function SummaryPanel({
   saveAs: (fileName: string, text: string) => Promise<string | null>
   /** What was said, as turns; the written summary is read from it. */
   transcript?: readonly Turn[]
+  /**
+   * The transcript is being cleaned up: lines heard again so far. The
+   * written summary waits for the cleaner text.
+   */
+  cleaning?: { done: number; of: number } | null
 }) {
   const [preset, setPreset] = useState<SummaryPreset>(
     isPreset(initial.layout) ? initial.layout : 'decisions-actions'
@@ -214,17 +220,23 @@ export function SummaryPanel({
 
   // The first time a meeting is wrapped up, read it without being asked.
   const began = useRef(false)
+  const waiting = cleaning !== null
   const readFirst = useRef(readMeeting)
   useEffect(() => {
     readFirst.current = readMeeting
   })
   useEffect(() => {
-    if (began.current || initial.markdown !== null || transcript.length === 0) {
+    if (
+      began.current ||
+      initial.markdown !== null ||
+      transcript.length === 0 ||
+      waiting
+    ) {
       return
     }
     began.current = true
     void readFirst.current(true)
-  }, [initial.markdown, transcript.length])
+  }, [initial.markdown, transcript.length, waiting])
 
   return (
     <section
@@ -329,6 +341,13 @@ export function SummaryPanel({
           The model on this PC is reading the meeting, part {reading.step} of{' '}
           {reading.of}. A half-hour meeting takes several minutes; the text
           below stays until it is done, and you can keep working.
+        </p>
+      )}
+      {cleaning && (
+        <p role="status" className="text-secondary text-text-muted">
+          Cleaning the transcript with the second speech model: line{' '}
+          {cleaning.done} of {cleaning.of}. The written summary starts once it
+          is done.
         </p>
       )}
       {unread && !writing && (
