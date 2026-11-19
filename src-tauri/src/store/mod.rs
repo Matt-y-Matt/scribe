@@ -883,6 +883,103 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_database_from_before_the_clean_up_is_upgraded_in_place_and_cleaned() {
+        // A file at schema 2, as this PC's database was, written through a
+        // pool of several connections like the app's.
+        let path = std::env::temp_dir().join(format!("scribe-upgrade-{}.db", std::process::id()));
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
+        }
+        {
+            let options = SqliteConnectOptions::new()
+                .filename(&path)
+                .create_if_missing(true);
+            let pool = SqlitePoolOptions::new()
+                .max_connections(4)
+                .connect_with(options)
+                .await
+                .unwrap();
+            for sql in &schema::MIGRATIONS[..2] {
+                sqlx::raw_sql(sql).execute(&pool).await.unwrap();
+            }
+            sqlx::raw_sql("PRAGMA user_version = 2")
+                .execute(&pool)
+                .await
+                .unwrap();
+            sqlx::query(
+                "INSERT INTO meetings (id, title, created_at_ms, ended_at_ms) VALUES ('m_1', 'Edwin', 1, 2)",
+            )
+            .execute(&pool)
+            .await
+            .unwrap();
+            for (id, t0, text) in [
+                ("s_1", 0, "high cost chin years all"),
+                ("s_2", 3_000, "Yeah."),
+            ] {
+                sqlx::query(
+                    "INSERT INTO segments (id, meeting_id, t0_ms, t1_ms, speaker_label, source, text, confidence) \
+                     VALUES (?, 'm_1', ?, ?, 'Room', 'laptop', ?, 1.0)",
+                )
+                .bind(id)
+                .bind(t0)
+                .bind(t0 + 2_500)
+                .bind(text)
+                .execute(&pool)
+                .await
+                .unwrap();
+            }
+            pool.close().await;
+        }
+
+        let store = Store::open(&path).await.unwrap();
+        // Every connection of the pool reads the new shape at once.
+        for _ in 0..8 {
+            assert_eq!(store.segments("m_1").await.unwrap().len(), 2);
+            assert!(!store.meeting("m_1").await.unwrap().unwrap().cleaned);
+        }
+
+        store
+            .clean_segments("m_1", &[("s_1".into(), "Chinese New Year also".into())])
+            .await
+            .unwrap();
+        let segments = store.segments("m_1").await.unwrap();
+        assert_eq!(segments[0].id, "s_1");
+        assert_eq!(segments[0].text, "Chinese New Year also");
+        assert_eq!(segments[1].text, "Yeah.");
+        assert!(store.meeting("m_1").await.unwrap().unwrap().cleaned);
+        // What the live model heard is kept, and only the first time.
+        store
+            .clean_segments("m_1", &[("s_1".into(), "Chinese New Year".into())])
+            .await
+            .unwrap();
+        let live: Option<String> =
+            sqlx::query_scalar("SELECT live_text FROM segments WHERE id = 's_1'")
+                .fetch_one(&store.pool)
+                .await
+                .unwrap();
+        assert_eq!(live.as_deref(), Some("high cost chin years all"));
+        // The search index follows the new text and forgets the old.
+        assert_eq!(
+            store
+                .search_segments(Some("m_1"), "chinese", 10)
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+        assert!(store
+            .search_segments(Some("m_1"), "chin years", 10)
+            .await
+            .unwrap()
+            .is_empty());
+
+        store.pool.close().await;
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", path.display()));
+        }
+    }
+
+    #[tokio::test]
     async fn a_meeting_is_renamed_and_deleted_with_all_that_was_kept_about_it() {
         let store = Store::in_memory().await.unwrap();
         for id in ["m_1", "m_2"] {

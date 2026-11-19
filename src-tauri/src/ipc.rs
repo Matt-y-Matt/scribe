@@ -24,6 +24,8 @@ use crate::session::{
 use crate::state::AppState;
 use crate::store::{Highlight, MapPatch, MapRows, MeetingInfo, NewMeeting, OpenAction, Summary};
 use crate::stt::models::{self, Downloader};
+use crate::stt::{default_threads, LocalSherpa, Transcriber};
+use std::sync::Arc;
 
 /// `segment:final` — one finished utterance of the meeting transcript.
 ///
@@ -198,11 +200,14 @@ pub async fn rename_meeting(
 }
 
 /// Deletes a meeting for good: its recording first, then everything the
-/// database holds about it. A meeting being recorded is refused (`busy`).
+/// database holds about it. A meeting being recorded, or having its
+/// transcript cleaned up, is refused (`busy`).
 #[tauri::command]
 #[specta::specta]
 pub async fn delete_meeting(state: State<'_, AppState>, meeting_id: String) -> CommandResult<()> {
-    if state.session.is_active(&meeting_id).await {
+    if state.session.is_active(&meeting_id).await
+        || state.cleaning.lock().await.as_deref() == Some(meeting_id.as_str())
+    {
         return Err(AppError::Busy);
     }
     state
@@ -535,8 +540,19 @@ pub async fn clean_transcript(
     if meeting.is_unfinished() {
         return Err(AppError::Busy);
     }
-    let transcriber =
-        (state.deps.transcriber)(models::CLEANUP_MODEL).map_err(|_| AppError::ModelMissing)?;
+    // Loaded on its own, not through the session's one-model cache: that
+    // would put Parakeet out, and the next Start would wait to load it again.
+    // Dropped when the pass is done.
+    let spec = models::spec(models::CLEANUP_MODEL).ok_or(AppError::ModelMissing)?;
+    let data_dir = state.data_dir.clone();
+    let transcriber: Arc<dyn Transcriber> = Arc::new(
+        tokio::task::spawn_blocking(move || {
+            LocalSherpa::load(spec, &data_dir, default_threads(), "cpu")
+        })
+        .await
+        .map_err(|error| AppError::Storage(error.to_string()))?
+        .map_err(|_| AppError::ModelMissing)?,
+    );
     {
         let mut running = state.cleaning.lock().await;
         if running.is_some() {
