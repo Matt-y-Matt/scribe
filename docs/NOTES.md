@@ -107,6 +107,50 @@ New dependency: `lucide-react` (ISC) for card-kind icons. Build the "⋯" menu o
 
 Done means the M1 gate in BUILD_PLAN: golden replay ≥ 80% card match, 5/5 topic coverage, 0 wrong owners, both pins, with the mock in CI and with one real provider; the score for each provider recorded in this file; `live.png` and `live-ghost.png` shown to Matt.
 
+## After the first real call — note-taker and summary (2026-11-20)
+
+Matt recorded a real 31-minute Discord call on 2026-11-19 (two people, no agenda, headphones that leak into the microphone) and found the notes and the summary poor. This section is what was found and changed. The meeting's content is not in the repository; `pnpm notes <transcript.jsonl>` replays an exported transcript through the note-taker and the summary on the Ollama of this PC, for reading.
+
+### What the recording showed
+
+- 492 transcript lines in 31 minutes: the cutter ends a line at 0.7 s of silence, so the median line was 4 to 5 words; 217 lines had three words or fewer and 111 were only filler.
+- The note-taker wrote a card per line: 85 cards, 82 of them notes, 2 decisions, 1 action. Each cited exactly one line. Mis-heard words were noted as said; some lines were noted twice.
+- Every line was labelled `Room` or `System audio`, so no action could have an owner.
+- With no agenda every topic was off the agenda, and each raised a pin suggestion: 8 topics, 8 suggestions.
+- The summary presets list decision and action cards and nothing else, so the summary was three lines.
+- Speech recognition ran at 0.63 of real time (bench: 0.16 to 0.21), with a median latency of 2.2 s, 8 s at the 95th percentile and 15 s at worst. The echo guard dropped 6 lines; the microphone still carried the other side's voice, mostly as garbled fragments.
+
+### What changed
+
+- **Turns** (`src/engine/turns.ts`). Before a model reads the transcript, filler-only lines are left out, a microphone line that repeats what the PC was playing is left out, and one speaker's lines across pauses of up to 2 s are joined, up to 60 words. Behind a microphone the core cannot name (`Room`, `System audio`) only pauses up to 1 s join. A card cites every line of its turn. The recording's 492 lines are 214 turns. The transcript itself is untouched.
+- **Speaker names** (`src/engine/speakers.ts`). On a call the microphone is the first person on the meeting's list; with exactly one other person listed, the system audio is that person. The Pre-meeting sheet says to put yourself first. Only the note-taker and the summary see the names.
+- **Written summary** (`src/engine/written-summary.ts`, the Written option on the end screen). The model takes notes on each stretch of about 700 words, then writes topics, open questions and a gist from those notes. Decisions and actions come from the notes as written, after the ticked cards; the writing step never rewords them. A deadline is kept only if its words were said in the meeting. The first time a meeting is wrapped up this runs by itself and the preset stands until it is done; if Ollama does not answer the panel says so and keeps the preset.
+- **Repeats and pins** (`src/engine/apply.ts`). A card that shares 75% of its words with a card of the same kind in its topic is dropped as a duplicate. A meeting with no agenda raises no pin suggestions.
+- **Rules for broken speech** (`LIVE_RULES` in `src/engine/providers/cards.ts`). A live meeting's requests end with a short section: write a card only for what can be said in a line that stands by itself, never copy a word that makes no sense, a request belongs to the person asked, `Room` is not a person. Live requests also get an `unclear` segment type.
+
+### On the recording, with `qwen3.5:4b`
+
+- Live notes: 85 cards → 47, in 15 topics, 0 pin suggestions, the one action given to the right person. Still wrong: a few garbled lines are noted as said, 15 topics is too many for half an hour, and it marked no decisions (the notes taken during the call had 2).
+- Written summary: 6 requests, about 60 s. It gets the meeting's subjects, the main decision and the timeline right in most runs. It is not stable from one wording of the prompt to the next: across four runs it once moved a date by three weeks (before the two-step design), dropped a decision the live notes had, and gave an action to the wrong person. That is why the ticked cards lead its lists, and why the panel says to check names, numbers and dates.
+
+### Golden test
+
+- Unchanged system prompt, new code: mock 17/17; Ollama `qwen3.5:4b` paced 5/5 and 16/17, at 10× 5/5 and 14/17. Both pass.
+- **The rules for broken speech are not in the system prompt, and the golden test does not cover them.** Six wordings of them were tried in `structurer-cards.md`. With all of them the model filed the artwork talk under the wrong header and CLA coverage fell from 12/15 to 8–11/15, a fail; one wording passed paced and failed at 10×. A 4B model's filing of a clean transcript changes with almost any sentence added to its prompt. So the prompt is as it was, and the rules go at the end of a live meeting's message only (`liveSpeech`), which the fixture replay does not set. A second fixture made of broken speech is what would test them.
+
+### Not verified
+
+- None of this has run inside the Tauri window. The engine parts ran against the real Ollama from `pnpm notes` and `pnpm golden`; the end screen ran in vitest and Playwright with a fake model.
+- One recording. The numbers above are that call's.
+- A room with several people behind one microphone: turns there join lines only across the shortest pauses, and no real room has been recorded yet.
+
+### Left for later
+
+- The headphone leak is still in the transcript. Only near-verbatim repeats are kept from the models; half-cancelled echo is not, and telling it from a quiet talker needs the audio (see `audio/echo.rs`).
+- Speech recognition at 0.63 of real time during the call, against 0.16 to 0.21 in the bench: not looked into.
+- The summary's actions that are not cards are not on the end screen's lists and get no draft. Turning them into cards for the host to tick is the next step.
+- A larger local model for the summary only. `qwen3.5:9b` is 6.6 GB at q4_K_M (ollama.com, 2026-11-19), borderline on the 8 GB card; the summary does not have to be fast. Not tried.
+
 ## After M2 — the screens around a meeting (2026-11-19)
 
 Matt asked to keep building before his real 60-minute meeting (planned for 2026-11-20), on parts that do not lean on capture. The M2 gate is still open; see "The gate test, for Matt" below. Nothing in capture, echo handling, the cutter or speech-to-text was touched. The one change in the Rust core is two commands that read and save a meeting's summary. Proposals for what to build next, for Matt to pick from, are in `docs/PROPOSALS.md`.

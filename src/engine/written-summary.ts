@@ -248,6 +248,11 @@ function cleanActions(
     .filter(action => !saysNothing(action.text))
 }
 
+export interface Noted {
+  decisions: readonly string[]
+  actions: readonly Action[]
+}
+
 export interface WriteOptions {
   title: string
   participants: readonly string[]
@@ -256,8 +261,9 @@ export interface WriteOptions {
   /**
    * What the live notes already hold as decisions and actions. They lead the
    * summary's lists as they stand; the model's reading adds what they lack.
+   * A function is asked once the reading is done, for what holds then.
    */
-  noted?: { decisions: readonly string[]; actions: readonly Action[] }
+  noted?: Noted | (() => Noted)
   model?: string
   stretchWords?: number
   signal?: AbortSignal
@@ -388,6 +394,8 @@ export async function writeMeetingSummary(
     )
   )
   if (!written.success) throw new Error('the model did not write a summary')
+  const noted =
+    typeof options.noted === 'function' ? options.noted() : options.noted
 
   return {
     gist: tidy(written.data.gist),
@@ -400,17 +408,11 @@ export async function writeMeetingSummary(
     // The live notes' own first, then what the reading found, in meeting
     // order and as written: the writing step never rewords these.
     decisions: unique(
-      [
-        ...(options.noted?.decisions ?? []),
-        ...all.flatMap(notes => notes.decisions),
-      ],
+      [...(noted?.decisions ?? []), ...all.flatMap(notes => notes.decisions)],
       sameLine
     ),
     actions: unique(
-      [
-        ...(options.noted?.actions ?? []),
-        ...all.flatMap(notes => notes.actions),
-      ],
+      [...(noted?.actions ?? []), ...all.flatMap(notes => notes.actions)],
       (a, b) => a.owner === b.owner && sameLine(a.text, b.text)
     ),
     open: tidyList(written.data.open).slice(0, MAX_OPEN),

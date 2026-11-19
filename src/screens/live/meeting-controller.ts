@@ -2,6 +2,7 @@ import { ulid } from 'ulid'
 import { RowAdapter } from '@/engine/persist'
 import cardsPrompt from '@/engine/prompts/structurer-cards.md?raw'
 import { createOllamaProvider } from '@/engine/providers/ollama'
+import { named, speakerNames } from '@/engine/speakers'
 import { MapStore } from '@/engine/store'
 import { Structurer } from '@/engine/structurer'
 import type { SegmentFinal } from '@/ipc'
@@ -113,6 +114,8 @@ export async function openMeeting(
       { kind: 'ollama', prompt: cardsPrompt },
       body => backend.ollamaChat(body)
     ),
+    // What it reads is speech recognition, not a written transcript.
+    liveSpeech: true,
     log: (message, context) => logger.info(message, context),
     // A run that failed keeps its lines for the next one, so the map
     // catches up by itself; until then the host is told it is behind.
@@ -124,7 +127,14 @@ export async function openMeeting(
     session.setState(state => ({
       segments: withSegment(state.segments, segment),
     }))
-    structurer.segmentFinal(segment)
+    // The note-taker reads a name where the meeting's own facts give one
+    // ("Room" cannot own an action); the transcript keeps the core's label.
+    structurer.segmentFinal(
+      named(
+        segment,
+        speakerNames(meeting.participants, session.getState().loopback)
+      )
+    )
   }
 
   const stops = [

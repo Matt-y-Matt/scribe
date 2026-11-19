@@ -173,6 +173,8 @@ export function PreMeeting({
           />
           <p className="text-meta text-text-muted">
             Names, separated by commas, so an action can be given to its owner.
+            Put yourself first: on a call, your microphone is taken to be the
+            first name.
           </p>
         </label>
 

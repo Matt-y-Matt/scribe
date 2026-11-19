@@ -122,6 +122,19 @@ describe('toTurns', () => {
     expect(turns).toHaveLength(2)
   })
 
+  it('joins less readily behind a microphone several people share', () => {
+    const lines = (speaker: string) => [
+      line(speaker, 0, 2_000, 'Can we split the order?'),
+      // 1.5 s later: one person thinking, or the next person answering.
+      line(speaker, 3_500, 5_000, 'Their minimum is three hundred.'),
+      line(speaker, 5_800, 7_000, 'Per colour.'),
+    ]
+    expect(toTurns(lines('Matt')).map(turn => turn.covers.length)).toEqual([3])
+    expect(toTurns(lines('Room')).map(turn => turn.covers.length)).toEqual([
+      1, 2,
+    ])
+  })
+
   it('puts lines in meeting order whatever order they arrive in', () => {
     const turns = toTurns([
       line('Zach', 5_000, 6_000, 'Second thing said.'),

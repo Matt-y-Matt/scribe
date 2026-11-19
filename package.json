@@ -20,6 +20,7 @@
     "test": "vitest run && cargo test --manifest-path src-tauri/Cargo.toml",
     "replay": "tsx scripts/replay.ts",
     "golden": "tsx scripts/golden.ts",
+    "notes": "tsx scripts/notes.ts",
     "screenshot": "tsx scripts/screenshot.ts",
     "e2e": "playwright test",
     "ipc": "cargo test --manifest-path src-tauri/Cargo.toml export_ipc -- --ignored"

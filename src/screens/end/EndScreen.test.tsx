@@ -258,9 +258,135 @@ describe('EndScreen', () => {
     await waitFor(() =>
       expect(text.value).toBe('# In plain words\n\nAll good.\n')
     )
-    expect(ollamaChat.mock.calls[0]?.[0]).toContain(
-      'plain words, one paragraph'
+    expect(
+      ollamaChat.mock.calls.some(([body]) =>
+        body.includes('plain words, one paragraph')
+      )
+    ).toBe(true)
+  })
+
+  /** A model on this PC that reads a meeting: notes per stretch, then a gist. */
+  const reader = () =>
+    vi.fn(async (body: string) => {
+      const system = (JSON.parse(body) as { messages: { content: string }[] })
+        .messages[0]?.content
+      const reply = system?.startsWith('You take notes')
+        ? {
+            subject: 'CLA quote',
+            points: ['Ross wants 280 sets under 40 dollars a set.'],
+            decisions: ['Quote 42 a set.'],
+            actions: [
+              { owner: 'Ant', text: 'Send the mockups', due: 'Wednesday' },
+            ],
+            open: [],
+          }
+        : {
+            topics: [
+              { title: 'CLA quote', points: ['Ross wants 280 sets under 40.'] },
+            ],
+            open: ['Whether names are in scope.'],
+            gist: 'The team priced the CLA order and split the supplier work.',
+          }
+      return JSON.stringify({ message: { content: JSON.stringify(reply) } })
+    })
+
+  it('has the local model read the meeting the first time it is wrapped up', async () => {
+    const ollamaChat = reader()
+    const { saveSummary } = show({ backend: { ollamaChat } })
+    const text = await summaryText()
+    await waitFor(() =>
+      expect(text.value).toContain(
+        'The team priced the CLA order and split the supplier work.'
+      )
     )
+    // The transcript went to the model as turns, a stretch at a time.
+    expect(ollamaChat.mock.calls[0]?.[0]).toContain(
+      'TRANSCRIPT OF THIS STRETCH'
+    )
+    expect(text.value).toContain('## Discussed\n\n### CLA quote')
+    // What is ticked leads the lists; what the reading found is added once.
+    expect(text.value).toContain('- **Kabs**: Call Ross')
+    expect(text.value).toContain('- **Ant**: Send the mockups, due Wednesday')
+    expect(text.value.match(/Send the mockups/g)).toHaveLength(1)
+    expect(text.value).toContain(
+      '## Open questions\n- Whether names are in scope.'
+    )
+
+    expect(screen.getByRole('radio', { name: 'Written' })).toBeChecked()
+    expect(screen.getByText(/from the transcript/)).toBeVisible()
+    await waitFor(() =>
+      expect(saveSummary).toHaveBeenLastCalledWith('m_fixture', {
+        markdown: text.value,
+        layout: 'written',
+      })
+    )
+
+    // A preset is one click away, and Written reads the meeting again.
+    fireEvent.click(screen.getByRole('radio', { name: 'Decisions & actions' }))
+    expect(text.value).not.toContain('## Discussed')
+    const calls = ollamaChat.mock.calls.length
+    fireEvent.click(screen.getByRole('radio', { name: 'Written' }))
+    await waitFor(() => expect(text.value).toContain('## Discussed'))
+    expect(ollamaChat.mock.calls.length).toBeGreaterThan(calls)
+  })
+
+  it('leaves the list of what is ticked, and says why, when no model answers', async () => {
+    // The fixture backend has no core, so no model.
+    show()
+    const text = await summaryText()
+    expect(
+      await screen.findByText(/did not answer, so this is the list/)
+    ).toBeVisible()
+    expect(text.value).toContain('## Decisions')
+    expect(text.value).not.toContain('## Discussed')
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(
+      screen.getByRole('radio', { name: 'Decisions & actions' })
+    ).toBeChecked()
+  })
+
+  it('does not read a meeting again that already has its summary', async () => {
+    const ollamaChat = reader()
+    show({
+      backend: { ollamaChat },
+      summaries: {
+        m_fixture: {
+          markdown: '# Mine\n\nEdited by hand.\n',
+          layout: 'written',
+        },
+      },
+    })
+    const text = await summaryText()
+    expect(text.value).toBe('# Mine\n\nEdited by hand.\n')
+    expect(screen.getByRole('radio', { name: 'Written' })).toBeChecked()
+    await act(async () => {
+      await new Promise(done => setTimeout(done, 20))
+    })
+    expect(ollamaChat).not.toHaveBeenCalled()
+  })
+
+  it('keeps what the host typed while the model was still reading', async () => {
+    let release: () => void = () => undefined
+    const held = new Promise<void>(done => {
+      release = done
+    })
+    const read = reader()
+    const ollamaChat = vi.fn(async (body: string) => {
+      await held
+      return read(body)
+    })
+    show({ backend: { ollamaChat } })
+    const text = await summaryText()
+    fireEvent.change(text, { target: { value: 'My own words.' } })
+    await act(async () => {
+      release()
+      await new Promise(done => setTimeout(done, 20))
+    })
+    await waitFor(() => expect(ollamaChat.mock.calls.length).toBeGreaterThan(1))
+    await waitFor(() =>
+      expect(screen.queryByText(/is reading the meeting/)).toBeNull()
+    )
+    expect(text.value).toBe('My own words.')
   })
 
   it('changes nothing and says so when the local model does not answer', async () => {

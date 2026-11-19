@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import { Button } from '@/components/ui/button'
 import { confirmCards } from '@/engine/actions'
+import { meetingTurns, speakerNames } from '@/engine/speakers'
 import type { MapStore } from '@/engine/store'
 import { draftsOf, listedCards, wrapUpOf } from '@/engine/summary'
 import { reasonOf, useBackend } from '@/lib/backend'
@@ -40,7 +41,14 @@ export function EndScreen({
   const state = useMapState(store)
   const meetingId = state.meeting.id
   const elapsedMs = useStore(session, live => live.elapsedMs)
+  const segments = useStore(session, live => live.segments)
+  const loopback = useStore(session, live => live.loopback)
   const [readingBack, setReadingBack] = useState(false)
+  // What was said, as the written summary reads it.
+  const transcript = meetingTurns(
+    segments,
+    speakerNames(state.meeting.participants, loopback)
+  )
 
   const meeting = useQuery({
     queryKey: ['meeting', meetingId],
@@ -180,6 +188,7 @@ export function EndScreen({
               <SummaryPanel
                 state={state}
                 meta={meta}
+                transcript={transcript}
                 initial={saved.data}
                 ask={body => backend.ollamaChat(body)}
                 saveAs={(fileName, text) => backend.saveTextAs(fileName, text)}

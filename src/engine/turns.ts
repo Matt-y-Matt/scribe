@@ -47,6 +47,13 @@ export interface TurnOptions {
 
 /** Long enough to bridge a thinking pause, short enough to keep replies apart. */
 const MAX_GAP_MS = 2_000
+/**
+ * The core's labels for a microphone it cannot put a name to. Several people
+ * may be behind one, so only the shortest pause joins two of its lines:
+ * anything longer may be the next person answering.
+ */
+const UNNAMED = new Set(['Room', 'System audio'])
+const SHARED_GAP_MS = 1_000
 /** Two full sentences already make a note; more only blurs what it cites. */
 const MAX_WORDS = 60
 /** The speakers reach the microphone within this of the loopback hearing them. */
@@ -127,9 +134,12 @@ export function toTurns(
   for (const line of kept) {
     const words = wordsOf(line.text).length
     const current = open.get(line.speaker)
+    const gapMs = UNNAMED.has(line.speaker)
+      ? Math.min(maxGapMs, SHARED_GAP_MS)
+      : maxGapMs
     if (
       current &&
-      line.t0 - current.t1 <= maxGapMs &&
+      line.t0 - current.t1 <= gapMs &&
       current.words + words <= maxWords
     ) {
       current.covers.push(line.id)
