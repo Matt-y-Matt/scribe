@@ -64,8 +64,11 @@ export interface MapCanvasProps {
   dispatch: ActionDispatch<[action: CanvasAction]>
   initialViewport: Viewport
   onZoom: (zoom: number) => void
-  /** The header the host asked to see, and a count that changes per ask. */
-  focus: { headerId: string; ask: number } | null
+  /**
+   * The column or topic the host asked to see, and a count that changes per
+   * ask.
+   */
+  focus: { nodeId: string; ask: number } | null
 }
 
 function Flow({
@@ -127,15 +130,22 @@ function Flow({
     })
   }, [store, flow])
 
-  // An agenda chip was clicked: put that column at the left edge. The host
-  // asked, so this is not the map moving by itself (rule 4.2).
+  // An agenda chip was clicked, or a search result picked: put that column
+  // at the left edge, and a topic near the top as well. The host asked, so
+  // this is not the map moving by itself (rule 4.2).
   useEffect(() => {
     if (!focus) return
-    const node = flow.getInternalNode(focus.headerId)
+    const node = flow.getInternalNode(focus.nodeId)
     if (!node) return
     const { y, zoom } = flow.getViewport()
+    const at = node.internals.positionAbsolute
     void flow.setViewport(
-      { x: 16 - node.internals.positionAbsolute.x * zoom, y, zoom },
+      {
+        x: 16 - at.x * zoom,
+        // A topic is shown with its column's title still above it.
+        y: node.type === 'topic' ? 56 - at.y * zoom : y,
+        zoom,
+      },
       { duration: 0 }
     )
   }, [focus, flow])

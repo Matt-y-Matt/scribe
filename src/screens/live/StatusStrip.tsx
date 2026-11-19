@@ -1,4 +1,4 @@
-import { Settings } from 'lucide-react'
+import { Search, Settings } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import { Button } from '@/components/ui/button'
@@ -155,7 +155,7 @@ function Levels() {
 }
 
 export function StatusStrip() {
-  const { session, actions, state, focusHeader } = useLive()
+  const { session, actions, state, focusHeader, openPalette } = useLive()
   const rec = useStore(session, store => store.rec)
   const review = useStore(session, store => store.review)
   const agenda = headersOf(state).filter(header => !header.off_agenda)
@@ -222,6 +222,15 @@ export function StatusStrip() {
       >
         local
       </span>
+      <button
+        type="button"
+        aria-label="Search this meeting"
+        title="Search this meeting (Ctrl+K)"
+        className="flex size-7 items-center justify-center rounded-md text-text-muted transition-opacity duration-150 ease-out hover:bg-surface-2"
+        onClick={openPalette}
+      >
+        <Search size={16} aria-hidden />
+      </button>
       <button
         type="button"
         aria-label="Settings"

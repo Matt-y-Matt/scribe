@@ -27,6 +27,10 @@ export interface LiveContextValue {
   actions: SessionActions
   /** Brings a header's column into view on the map, at the host's request. */
   focusHeader: (headerId: string) => void
+  /** Brings a topic into view on the map, at the host's request. */
+  focusTopic: (topicId: string) => void
+  /** Opens the search over the map (Ctrl+K). */
+  openPalette: () => void
 }
 
 export const LiveContext = createContext<LiveContextValue | null>(null)

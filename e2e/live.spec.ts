@@ -394,6 +394,41 @@ test.describe('editing by hand', () => {
   })
 })
 
+test.describe('search (Ctrl+K)', () => {
+  test('finds a card and brings its topic into view; Escape leaves the map alone', async ({
+    page,
+  }) => {
+    const errors = await open(page, 'live')
+    const before = await viewport(page)
+
+    // Opening, typing and closing moves nothing: P, T and F are text here.
+    await page.keyboard.press('Control+k')
+    const box = page.getByRole('combobox', { name: 'Search this meeting' })
+    await expect(box).toBeFocused()
+    await box.pressSequentially('ptf')
+    await page.keyboard.press('Escape')
+    await expect(box).toHaveCount(0)
+    expect(await viewport(page)).toBe(before)
+    await expect(pinsRail(page)).toContainText('PINS (2)')
+
+    // Picking a result is the host asking: the map goes to that topic.
+    await page.getByRole('button', { name: 'Search this meeting' }).click()
+    await box.fill('job description')
+    await expect(page.getByRole('option').first()).toContainText(
+      'Write the job description'
+    )
+    await page.keyboard.press('Enter')
+    await expect(box).toHaveCount(0)
+    await expect(topic(page, 'Full-time or freelance')).toHaveAttribute(
+      'data-active',
+      'true'
+    )
+    expect(await viewport(page)).not.toBe(before)
+    await expect(topic(page, 'Full-time or freelance')).toBeInViewport()
+    expect(errors).toEqual([])
+  })
+})
+
 test.describe('pins and the topic menu', () => {
   test('P pins the active topic; Revisit brings it back with the accent border', async ({
     page,

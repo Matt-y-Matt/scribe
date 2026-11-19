@@ -12,6 +12,7 @@ import {
   type LiveContextValue,
 } from './live-context'
 import { COLLAPSE_ZOOM, MapCanvas } from './MapCanvas'
+import { Palette } from './Palette'
 import { PinsRail } from './PinsRail'
 import type { SessionActions, SessionStore } from './session'
 import { StatusStrip } from './StatusStrip'
@@ -139,12 +140,25 @@ export function LiveScreen({
   const [chosenTopicId, setActiveTopicId] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState(zoom < COLLAPSE_ZOOM)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [focus, setFocus] = useState<{ headerId: string; ask: number } | null>(
+  const [focus, setFocus] = useState<{ nodeId: string; ask: number } | null>(
     null
   )
+  const [palette, setPalette] = useState(false)
   const [toast, setToast] = useState<{ id: number; message: string } | null>(
     null
   )
+
+  // Ctrl+K opens the search from anywhere on the screen, and closes it.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return
+      if (event.key.toLowerCase() !== 'k') return
+      event.preventDefault()
+      setPalette(open => !open)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   useEffect(() => {
     if (!toast) return
@@ -170,8 +184,11 @@ export function LiveScreen({
     notify: message => setToast({ id: Date.now(), message }),
     session,
     actions,
-    focusHeader: headerId =>
-      setFocus(asked => ({ headerId, ask: (asked?.ask ?? 0) + 1 })),
+    focusHeader: nodeId =>
+      setFocus(asked => ({ nodeId, ask: (asked?.ask ?? 0) + 1 })),
+    focusTopic: nodeId =>
+      setFocus(asked => ({ nodeId, ask: (asked?.ask ?? 0) + 1 })),
+    openPalette: () => setPalette(true),
   }
 
   return (
@@ -218,6 +235,7 @@ export function LiveScreen({
             </aside>
           </div>
           <Timeline />
+          {palette && <Palette onClose={() => setPalette(false)} />}
           {overlay}
         </div>
       </main>

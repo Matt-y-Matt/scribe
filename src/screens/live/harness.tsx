@@ -26,6 +26,7 @@ export function LiveHarness({
   session,
   actions,
   onFocusHeader,
+  onFocusTopic,
   children,
 }: {
   store: MapStore
@@ -34,6 +35,7 @@ export function LiveHarness({
   session?: SessionStore
   actions?: Partial<SessionActions>
   onFocusHeader?: (headerId: string) => void
+  onFocusTopic?: (topicId: string) => void
   children: ReactNode
 }) {
   const state = useMapState(store)
@@ -55,6 +57,8 @@ export function LiveHarness({
     session: session ?? ownSession,
     actions: { ...idleActions, ...actions },
     focusHeader: headerId => onFocusHeader?.(headerId),
+    focusTopic: topicId => onFocusTopic?.(topicId),
+    openPalette: () => undefined,
   }
   return (
     <LiveContext value={live}>
