@@ -20,7 +20,7 @@ import {
 // and actions that change the page and nothing else.
 
 export type FixtureMode =
-  'recording' | 'paused' | 'no-mic' | 'model-missing' | 'review'
+  'recording' | 'paused' | 'no-mic' | 'model-missing' | 'review' | 'wrap'
 
 export interface FixtureSessionOptions {
   /** Stop after this segment. Default: the whole meeting. */
@@ -85,10 +85,11 @@ export function fixtureSessionState(
     rec:
       mode === 'paused'
         ? 'paused'
-        : mode === 'review'
+        : mode === 'review' || mode === 'wrap'
           ? 'stopped'
           : 'recording',
-    review: mode === 'review',
+    review: mode === 'review' || mode === 'wrap',
+    view: mode === 'wrap' ? 'wrap' : 'map',
     elapsedMs,
     modelMissing: mode === 'model-missing',
     // With no model the meeting is recorded and nothing is transcribed.
@@ -120,7 +121,10 @@ export function fixtureActions(session: SessionStore): SessionActions {
     ...idleActions,
     pause: () => session.setState({ rec: 'paused' }),
     resume: () => session.setState({ rec: 'recording' }),
-    stop: () => session.setState({ rec: 'stopped', review: true }),
+    stop: () =>
+      session.setState({ rec: 'stopped', review: true, view: 'wrap' }),
+    wrapUp: () => session.setState({ view: 'wrap' }),
+    showMap: () => session.setState({ view: 'map' }),
     search: async query => {
       const words = query.toLowerCase().split(/\s+/).filter(Boolean)
       return session

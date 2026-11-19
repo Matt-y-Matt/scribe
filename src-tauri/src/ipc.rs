@@ -21,7 +21,7 @@ use crate::session::{
     StartOptions,
 };
 use crate::state::AppState;
-use crate::store::{Highlight, MapPatch, MapRows, MeetingInfo, NewMeeting};
+use crate::store::{Highlight, MapPatch, MapRows, MeetingInfo, NewMeeting, Summary};
 use crate::stt::models::{self, Downloader};
 
 /// `segment:final` — one finished utterance of the meeting transcript.
@@ -163,6 +163,23 @@ pub async fn get_meeting(
         .meeting(&meeting_id)
         .await?
         .ok_or(AppError::NotFound)
+}
+
+/// The meeting's written summary; empty until the end screen writes one.
+#[tauri::command]
+#[specta::specta]
+pub async fn get_summary(state: State<'_, AppState>, meeting_id: String) -> CommandResult<Summary> {
+    Ok(state.store.summary(&meeting_id).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn save_summary(
+    state: State<'_, AppState>,
+    meeting_id: String,
+    summary: Summary,
+) -> CommandResult<()> {
+    Ok(state.store.save_summary(&meeting_id, &summary).await?)
 }
 
 // ---- recording ------------------------------------------------------------
@@ -521,6 +538,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             create_meeting,
             list_meetings,
             get_meeting,
+            get_summary,
+            save_summary,
             start,
             pause,
             resume,

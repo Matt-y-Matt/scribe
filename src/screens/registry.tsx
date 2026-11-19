@@ -11,10 +11,12 @@ import {
   Live,
   LiveGhost,
   LiveUnplanned,
+  End,
   LiveZoomedOut,
   ModelMissing,
   NoMicError,
   Paused,
+  Review,
 } from './live/LiveFixtures'
 import type { ScreenId } from './screens'
 
@@ -30,6 +32,8 @@ export const SCREENS: Record<ScreenId, ComponentType> = {
   paused: Paused,
   'nomic-error': NoMicError,
   'model-missing': ModelMissing,
+  review: Review,
+  end: End,
   'settings-audio': SettingsAudio,
   'settings-speech': SettingsSpeech,
 }

@@ -213,6 +213,32 @@ export interface CardEdit {
   kind?: CardKind
   owner?: string | null
   due_text?: string | null
+  /** Ticked on the end screen: it goes into the summary. */
+  confirmed?: boolean
+}
+
+/**
+ * Ticks or unticks several cards for the summary, as one operation. The end
+ * screen opens with everything ticked; that default is not something the
+ * host did, so it is logged as the engine's and Ctrl+Z does not take it back.
+ */
+export function confirmCards(
+  store: MapStore,
+  cardIds: readonly string[],
+  confirmed: boolean,
+  source: Source = 'user'
+): LogEntry | null {
+  const cards = store.getState().cards
+  return store.commit(
+    'edit_card',
+    source,
+    cardIds.flatMap(id => {
+      const card = cards[id]
+      return card && card.confirmed !== confirmed
+        ? [cardChange(card, { confirmed })]
+        : []
+    })
+  )
 }
 
 export function editCard(

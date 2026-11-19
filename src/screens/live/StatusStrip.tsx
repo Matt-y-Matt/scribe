@@ -177,6 +177,11 @@ export function StatusStrip() {
           Home
         </Button>
       )}
+      {(review || rec === 'stopped') && (
+        <Button size="sm" onClick={actions.wrapUp}>
+          Summary
+        </Button>
+      )}
 
       <nav
         aria-label="Agenda"

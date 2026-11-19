@@ -19,6 +19,7 @@ import {
   type Recovered,
   type SegmentFinal,
   type StartOptions,
+  type Summary,
 } from '@/ipc'
 
 // Everything the screens ask of the Rust core, behind one interface. The app
@@ -34,6 +35,9 @@ export interface Backend {
   createMeeting(meeting: NewMeeting): Promise<MeetingInfo>
   unfinishedMeetings(): Promise<MeetingInfo[]>
   recoverMeeting(meetingId: string, modelId: string): Promise<Recovered>
+  /** The written summary; both fields null until one has been saved. */
+  getSummary(meetingId: string): Promise<Summary>
+  saveSummary(meetingId: string, summary: Summary): Promise<void>
 
   listDevices(): Promise<Devices>
   listModels(): Promise<ModelInfo[]>
@@ -130,6 +134,9 @@ export const tauriBackend: Backend = {
   unfinishedMeetings: () => ok(commands.unfinishedMeetings()),
   recoverMeeting: (meetingId, modelId) =>
     ok(commands.recoverMeeting(meetingId, modelId)),
+  getSummary: meetingId => ok(commands.getSummary(meetingId)),
+  saveSummary: (meetingId, summary) =>
+    done(commands.saveSummary(meetingId, summary)),
 
   listDevices: () => ok(commands.listDevices()),
   listModels: () => ok(commands.listModels()),

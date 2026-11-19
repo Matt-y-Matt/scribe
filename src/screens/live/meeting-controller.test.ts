@@ -204,11 +204,17 @@ describe('openMeeting', () => {
       elapsed_ms: 6_000,
       transcribing: true,
     })
+    // Stop goes to the end screen; the map is one action away, and back.
     expect(now()).toMatchObject({
       rec: 'stopped',
       review: true,
+      view: 'wrap',
       elapsedMs: 6_000,
     })
+    running.actions.showMap()
+    expect(now().view).toBe('map')
+    running.actions.wrapUp()
+    expect(now().view).toBe('wrap')
   })
 
   it('saves the new meeting’s headers, and every later commit', async () => {
@@ -248,6 +254,8 @@ describe('openMeeting', () => {
     expect(running.session.getState()).toMatchObject({
       rec: 'stopped',
       review: true,
+      // A past meeting opens on its map, not on the end screen.
+      view: 'map',
       elapsedMs: 90_000,
       peaks: [1, 2, 3],
       modelMissing: false,

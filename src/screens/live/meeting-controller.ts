@@ -118,6 +118,8 @@ export async function openMeeting(
         rec: next.state,
         elapsedMs: next.elapsed_ms,
         review: stopped,
+        // Stop goes to the end screen: who owes what, while it is fresh.
+        view: stopped && state.rec !== 'stopped' ? 'wrap' : state.view,
         // The core says so once the model has loaded.
         modelMissing: next.transcribing || stopped ? false : state.modelMissing,
         micLost: stopped ? false : state.micLost,
@@ -214,6 +216,11 @@ export async function openMeeting(
       quietly(backend.deleteHighlight(highlightId), 'highlight not removed')
     },
     openSettings,
+    wrapUp: () => {
+      quietly(backend.stopPlayback(), 'stop failed')
+      session.setState({ view: 'wrap' })
+    },
+    showMap: () => session.setState({ view: 'map' }),
     leave: () => {
       quietly(backend.stopPlayback(), 'stop failed')
       leave()

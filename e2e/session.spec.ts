@@ -41,7 +41,7 @@ async function open(page: Page, screen: string) {
     }
   })
   await page.goto(`/?screen=${screen}`)
-  await expect(indicator(page)).toBeVisible()
+  if (screen !== 'end') await expect(indicator(page)).toBeVisible()
   await page.waitForFunction(() => window.__scribe !== undefined)
   return errors
 }
@@ -240,6 +240,60 @@ test.describe('timeline', () => {
     await page.locator('body').press('[')
     await page.locator('body').press('[')
     expect((await session(page)).tMs).toBe(start - 10_000)
+  })
+})
+
+test.describe('the end of a meeting', () => {
+  test('Stop goes to the end screen; unticking a row takes it out of the summary', async ({
+    page,
+  }) => {
+    const errors = await open(page, 'live')
+    await page.getByRole('button', { name: 'Stop' }).click()
+
+    const summary = page.getByRole('textbox', { name: 'Summary text' })
+    await expect(summary).toHaveValue(/## Decisions/)
+    await expect(summary).toHaveValue(/Platform setup fee 7,500/)
+    await expect(
+      page.getByText('Nothing is sent from this screen.')
+    ).toBeVisible()
+
+    await page
+      .getByRole('checkbox', {
+        name: 'In the summary: Platform setup fee 7,500, one-time',
+      })
+      .uncheck()
+    await expect(summary).not.toHaveValue(/Platform setup fee/)
+    // Ctrl+Z takes back what the host did, not the ticks the screen opened with.
+    await page.keyboard.press('Control+z')
+    await expect(summary).toHaveValue(/Platform setup fee 7,500/)
+
+    // An action with no owner is pointed out, and gets a draft once it has one.
+    const actions = page.getByRole('region', { name: 'Actions' })
+    const owner = actions.getByLabel('Owner of: Write the CLA quote')
+    await owner.fill('')
+    await owner.blur()
+    await expect(actions).toContainText('1 has no owner')
+    await owner.fill('Kabs')
+    await owner.press('Enter')
+    await expect(actions).not.toContainText('no owner')
+    await expect(page.getByLabel('Draft for Kabs')).toHaveValue(
+      /Write the CLA quote/
+    )
+    expect(errors).toEqual([])
+  })
+
+  test('the map and the recording are one click away, and Summary comes back', async ({
+    page,
+  }) => {
+    await open(page, 'end')
+    await page.getByRole('button', { name: 'Map and recording' }).click()
+    await expect(indicator(page)).toContainText('REVIEW')
+    await expect(page.getByTestId('map')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Summary', exact: true }).click()
+    await expect(
+      page.getByRole('textbox', { name: 'Summary text' })
+    ).toBeVisible()
   })
 })
 

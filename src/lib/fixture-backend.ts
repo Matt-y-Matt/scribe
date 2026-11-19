@@ -7,6 +7,7 @@ import type {
   ModelInfo,
   RecordingState,
   SegmentFinal,
+  Summary,
 } from '@/ipc'
 import { BackendError, type Backend, type Unlisten } from './backend'
 
@@ -48,6 +49,7 @@ export interface FixtureData {
   /** The saved map of a meeting, by meeting id. */
   maps: Record<string, MapRows>
   highlights: Record<string, Highlight[]>
+  summaries: Record<string, Summary>
   /** A download in progress, replayed to every listener. */
   download: ModelDownload | null
 }
@@ -69,6 +71,7 @@ export function fixtureBackend(overrides: Partial<FixtureData> = {}): Backend {
     segments: {},
     maps: {},
     highlights: {},
+    summaries: {},
     download: null,
     ...overrides,
   }
@@ -114,6 +117,12 @@ export function fixtureBackend(overrides: Partial<FixtureData> = {}): Backend {
         duration_ms: row.duration_ms,
         segments_added: 0,
       }
+    },
+
+    getSummary: async meetingId =>
+      data.summaries[meetingId] ?? { markdown: null, layout: null },
+    saveSummary: async (meetingId, summary) => {
+      data.summaries[meetingId] = summary
     },
 
     listDevices: async () => data.devices,

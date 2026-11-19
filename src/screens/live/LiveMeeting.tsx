@@ -3,7 +3,7 @@ import { useApp } from '@/lib/app-state'
 import { reasonOf, useBackend } from '@/lib/backend'
 import { logger } from '@/lib/logger'
 import { Settings } from '../settings/Settings'
-import { LiveScreen } from './LiveScreen'
+import { MeetingScreen } from './MeetingScreen'
 import { openMeeting, type RunningMeeting } from './meeting-controller'
 
 // The live screen on the real core (meeting-controller.ts does the work).
@@ -81,7 +81,7 @@ export function LiveMeeting({
   }
 
   return (
-    <LiveScreen
+    <MeetingScreen
       store={running.store}
       session={running.session}
       actions={running.actions}

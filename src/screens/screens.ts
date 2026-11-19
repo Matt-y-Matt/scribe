@@ -14,6 +14,8 @@ export const SCREEN_IDS = [
   'paused',
   'nomic-error',
   'model-missing',
+  'review',
+  'end',
   'settings-audio',
   'settings-speech',
 ] as const

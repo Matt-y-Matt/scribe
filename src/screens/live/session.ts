@@ -15,6 +15,11 @@ export interface SessionState {
   elapsedMs: number
   /** A finished meeting, opened to read and play back (UI_SPEC §3.4). */
   review: boolean
+  /**
+   * What a finished meeting shows: its map and recording, or the end screen
+   * (UI_SPEC §3.3), which Stop goes to.
+   */
+  view: 'map' | 'wrap'
   /** Created and never recorded: opened from the list, not from Start. */
   notStarted: boolean
   /** Recording could not start: the PC has no microphone. */
@@ -49,6 +54,10 @@ export interface SessionActions {
   addHighlight(t0Ms: number, t1Ms: number, label: string): void
   removeHighlight(highlightId: string): void
   openSettings(tab: 'audio' | 'speech'): void
+  /** To the end screen: confirm who owes what, write the summary. */
+  wrapUp(): void
+  /** Back from the end screen to the map and the recording. */
+  showMap(): void
   /** Back to Home. */
   leave(): void
 }
@@ -64,6 +73,7 @@ export const emptySession = (
   rec: 'idle',
   elapsedMs: 0,
   review: false,
+  view: 'map',
   notStarted: false,
   noMic: false,
   micLost: false,
@@ -120,5 +130,7 @@ export const idleActions: SessionActions = {
   addHighlight: noop,
   removeHighlight: noop,
   openSettings: noop,
+  wrapUp: noop,
+  showMap: noop,
   leave: noop,
 }

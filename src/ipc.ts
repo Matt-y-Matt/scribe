@@ -38,6 +38,25 @@ async getMeeting(meetingId: string) : Promise<Result<MeetingInfo, AppError>> {
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * The meeting's written summary; empty until the end screen writes one.
+ */
+async getSummary(meetingId: string) : Promise<Result<Summary, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_summary", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async saveSummary(meetingId: string, summary: Summary) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_summary", { meetingId, summary }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async start(meetingId: string, options: StartOptions) : Promise<Result<RecordingState, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("start", { meetingId, options }) };
@@ -446,6 +465,11 @@ export type SuggestionRow = { id: string; meeting_id: string; kind: SuggestionKi
  */
 payload_json: string; status: SuggestionStatus; created_t_ms: number }
 export type SuggestionStatus = "open" | "accepted" | "dismissed"
+/**
+ * A meeting's written summary, and the instruction it was written to
+ * ("decisions and actions only, one page"). Both are the host's to edit.
+ */
+export type Summary = { markdown: string | null; layout: string | null }
 export type TopicKind = "header" | "topic"
 export type TopicRow = { id: string; meeting_id: string; parent_id: string | null; title: string; kind: TopicKind; order_key: number; status: TopicStatus; off_agenda: boolean; created_t_ms: number; pinned_t_ms: number | null; revisited_t_ms: number | null; scheduled_t_ms: number | null; segment_ids: string[] }
 export type TopicStatus = "active" | "pinned" | "done"

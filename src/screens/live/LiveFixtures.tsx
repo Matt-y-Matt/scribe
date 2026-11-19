@@ -1,8 +1,11 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { MapStore } from '@/engine/store'
+import { BackendContext } from '@/lib/backend'
+import { fixtureBackend } from '@/lib/fixture-backend'
 import { FIXTURE_PINS, fixtureStore, type FixtureOptions } from './fixture'
 import { fixtureSession, type FixtureMode } from './fixture-session'
-import { LiveScreen } from './LiveScreen'
+import { MeetingScreen } from './MeetingScreen'
 import { installTestHook } from './test-hook'
 
 // The live screen's `?screen=` states (docs/TEST_PLAN.md §8), each the golden
@@ -26,14 +29,40 @@ function fixtureScreen(
     const [{ session, actions }] = useState(() =>
       fixtureSession({ until: options.until, mode })
     )
+    // The end screen reads and saves the summary: a core that is not there.
+    const [backend] = useState(() =>
+      fixtureBackend({
+        meetings: [
+          {
+            id: 'm_fixture',
+            title: store.getState().meeting.title,
+            created_at_ms: Date.UTC(2026, 10, 17, 3, 0),
+            started_at_ms: Date.UTC(2026, 10, 17, 3, 0),
+            ended_at_ms: Date.UTC(2026, 10, 17, 3, 7),
+            duration_ms: session.getState().elapsedMs,
+            mode: 'group',
+            agenda: [],
+            participants: [...store.getState().meeting.participants],
+            loopback: false,
+          },
+        ],
+      })
+    )
+    const [client] = useState(
+      () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    )
     useEffect(() => installTestHook(store, session), [store, session])
     return (
-      <LiveScreen
-        store={store}
-        session={session}
-        actions={actions}
-        zoom={zoom}
-      />
+      <QueryClientProvider client={client}>
+        <BackendContext value={backend}>
+          <MeetingScreen
+            store={store}
+            session={session}
+            actions={actions}
+            zoom={zoom}
+          />
+        </BackendContext>
+      </QueryClientProvider>
     )
   }
 }
@@ -55,6 +84,12 @@ export const Paused = fixtureScreen({ until: 's022' }, undefined, 'paused')
 
 /** Start was pressed on a PC with no microphone. */
 export const NoMicError = fixtureScreen({}, undefined, 'no-mic')
+
+/** A finished meeting opened again: the map, the transcript, the recording. */
+export const Review = fixtureScreen({ pins: FIXTURE_PINS }, undefined, 'review')
+
+/** Stop was pressed: the end screen, everything ticked. */
+export const End = fixtureScreen({ pins: FIXTURE_PINS }, undefined, 'wrap')
 
 /** Recording with no speech model: audio is kept, the transcript is off. */
 export const ModelMissing = fixtureScreen(

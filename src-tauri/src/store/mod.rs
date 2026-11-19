@@ -99,6 +99,14 @@ pub struct MeetingInfo {
     pub loopback: bool,
 }
 
+/// A meeting's written summary, and the instruction it was written to
+/// ("decisions and actions only, one page"). Both are the host's to edit.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, Type)]
+pub struct Summary {
+    pub markdown: Option<String>,
+    pub layout: Option<String>,
+}
+
 impl MeetingInfo {
     /// Started and never stopped: a meeting to recover after a crash.
     pub fn is_unfinished(&self) -> bool {
@@ -396,6 +404,31 @@ impl Store {
             .bind(now_ms() as i64)
             .bind(duration_ms)
             .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// The summary of a meeting; empty until one has been written.
+    pub async fn summary(&self, meeting_id: &str) -> Result<Summary> {
+        let row = sqlx::query("SELECT summary_md, layout_instruction FROM meetings WHERE id = ?")
+            .bind(meeting_id)
+            .fetch_optional(&self.pool)
+            .await?;
+        Ok(match row {
+            Some(row) => Summary {
+                markdown: row.try_get("summary_md")?,
+                layout: row.try_get("layout_instruction")?,
+            },
+            None => Summary::default(),
+        })
+    }
+
+    pub async fn save_summary(&self, meeting_id: &str, summary: &Summary) -> Result<()> {
+        sqlx::query("UPDATE meetings SET summary_md = ?, layout_instruction = ? WHERE id = ?")
+            .bind(&summary.markdown)
+            .bind(&summary.layout)
+            .bind(meeting_id)
             .execute(&self.pool)
             .await?;
         Ok(())
@@ -743,6 +776,31 @@ mod tests {
         assert!(!ended.is_unfinished());
         assert_eq!(ended.duration_ms, 12_345);
         assert_eq!(store.meeting("m_none").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn a_summary_is_kept_with_its_meeting() {
+        let store = Store::in_memory().await.unwrap();
+        store
+            .create_meeting("m_1", &new_meeting("One"))
+            .await
+            .unwrap();
+        assert_eq!(store.summary("m_1").await.unwrap(), Summary::default());
+
+        let written = Summary {
+            markdown: Some(
+                "# One
+
+- Quote 42 a set"
+                    .into(),
+            ),
+            layout: Some("decisions and actions only".into()),
+        };
+        store.save_summary("m_1", &written).await.unwrap();
+        assert_eq!(store.summary("m_1").await.unwrap(), written);
+        // A meeting that is not there has no summary, and saving one is no error.
+        assert_eq!(store.summary("m_9").await.unwrap(), Summary::default());
+        store.save_summary("m_9", &written).await.unwrap();
     }
 
     #[tokio::test]
