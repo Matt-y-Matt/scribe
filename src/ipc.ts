@@ -51,7 +51,8 @@ async renameMeeting(meetingId: string, title: string) : Promise<Result<MeetingIn
 },
 /**
  * Deletes a meeting for good: its recording first, then everything the
- * database holds about it. A meeting being recorded is refused (`busy`).
+ * database holds about it. A meeting being recorded, or having its
+ * transcript cleaned up, is refused (`busy`).
  */
 async deleteMeeting(meetingId: string) : Promise<Result<null, AppError>> {
     try {
