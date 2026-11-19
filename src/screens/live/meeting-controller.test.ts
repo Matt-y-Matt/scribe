@@ -217,6 +217,66 @@ describe('openMeeting', () => {
     expect(now().view).toBe('wrap')
   })
 
+  it('brings what is still owed from earlier meetings of the same name', async () => {
+    const action = (
+      id: string,
+      meetingId: string,
+      title: string,
+      createdAt: number
+    ) => ({
+      card: {
+        id,
+        meeting_id: meetingId,
+        topic_id: 't_1',
+        kind: 'action' as const,
+        text: id,
+        owner: 'Kabs',
+        due_text: null,
+        segment_ids: [],
+        status: 'accepted' as const,
+        source: 'engine' as const,
+        created_t_ms: 0,
+        confirmed: true,
+        done_at_ms: null,
+        order_key: 0,
+      },
+      meeting_title: title,
+      meeting_created_at_ms: createdAt,
+      topic_title: 'Pricing',
+    })
+    const setCardDone = vi.fn<Backend['setCardDone']>(async () => undefined)
+    const { backend } = core(meeting({ title: 'Weekly', created_at_ms: 100 }), {
+      openActions: async () => [
+        action('c_same', 'm_0', ' weekly ', 50),
+        action('c_other', 'm_x', 'UDO review', 60),
+        // This meeting's own actions are on its map, not in the rail.
+        action('c_mine', 'm_1', 'Weekly', 100),
+      ],
+      setCardDone,
+    })
+    const running = await open(backend)
+    const now = () => running.session.getState()
+    expect(now().lastTime.map(row => row.card.id)).toEqual(['c_same'])
+
+    running.actions.setDone('c_same', true)
+    expect(now().lastTimeDone).toEqual(['c_same'])
+    expect(setCardDone).toHaveBeenCalledWith('c_same', true)
+    running.actions.setDone('c_same', false)
+    expect(now().lastTimeDone).toEqual([])
+    expect(setCardDone).toHaveBeenLastCalledWith('c_same', false)
+  })
+
+  it('opens the meeting even if the open actions cannot be read', async () => {
+    const { backend } = core(meeting(), {
+      openActions: async () => {
+        throw new BackendError({ kind: 'not_found' })
+      },
+    })
+    const running = await open(backend)
+    expect(running.session.getState().lastTime).toEqual([])
+    expect(running.session.getState().rec).toBe('recording')
+  })
+
   it('says the map is behind when the local model does not answer', async () => {
     // The core that is not there refuses every request to the model.
     const { backend, say } = core(meeting())

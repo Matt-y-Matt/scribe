@@ -3,7 +3,7 @@ import {
   parseFixtureMeta,
   toSegmentFinal,
 } from '@/engine/replay/fixture'
-import type { SegmentFinal } from '@/ipc'
+import type { OpenAction, SegmentFinal } from '@/ipc'
 import metaText from '../../../fixtures/meeting-custore-weekly.meta.json?raw'
 import transcript from '../../../fixtures/meeting-custore-weekly.jsonl?raw'
 import {
@@ -32,7 +32,46 @@ export interface FixtureSessionOptions {
   /** Stop after this segment. Default: the whole meeting. */
   until?: string
   mode?: FixtureMode
+  /** Three actions still open from last week's meeting of the same name. */
+  lastTime?: boolean
 }
+
+const WEEK_MS = 7 * 86_400_000
+const LAST_WEEK = Date.UTC(2026, 10, 10, 3, 0)
+
+const owed = (
+  id: string,
+  text: string,
+  owner: string | null,
+  due: string | null,
+  weeksAgo = 1
+): OpenAction => ({
+  card: {
+    id,
+    meeting_id: `m_week_${weeksAgo}`,
+    topic_id: 't_then',
+    kind: 'action',
+    text,
+    owner,
+    due_text: due,
+    segment_ids: [],
+    status: 'accepted',
+    source: 'engine',
+    created_t_ms: 95_000,
+    confirmed: true,
+    done_at_ms: null,
+    order_key: 0,
+  },
+  meeting_title: 'Custore weekly team meeting',
+  meeting_created_at_ms: LAST_WEEK - (weeksAgo - 1) * WEEK_MS,
+  topic_title: 'Pricing',
+})
+
+export const FIXTURE_LAST_TIME: OpenAction[] = [
+  owed('c_then_1', 'Chase UDO for the signed PO', 'Zach', 'Monday', 2),
+  owed('c_then_2', 'Send Ross the revised size chart', 'Kabs', 'Wednesday'),
+  owed('c_then_3', 'Book the photographer for the lookbook', 'Ant', null),
+]
 
 /** The fixture's segments, as the core would have announced them. */
 export function fixtureSegments(until?: string): SegmentFinal[] {
@@ -109,6 +148,7 @@ export function fixtureSessionState(
       system: 0,
     },
     peaks,
+    lastTime: options.lastTime ? FIXTURE_LAST_TIME : [],
     highlights:
       elapsedMs > 80_000 && mode !== 'model-missing'
         ? [
@@ -162,6 +202,12 @@ export function fixtureActions(session: SessionStore): SessionActions {
             label,
           },
         ],
+      })),
+    setDone: (cardId, isDone) =>
+      session.setState(state => ({
+        lastTimeDone: isDone
+          ? [...state.lastTimeDone, cardId]
+          : state.lastTimeDone.filter(id => id !== cardId),
       })),
     removeHighlight: highlightId =>
       session.setState(state => ({

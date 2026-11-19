@@ -215,6 +215,8 @@ export interface CardEdit {
   due_text?: string | null
   /** Ticked on the end screen: it goes into the summary. */
   confirmed?: boolean
+  /** When it was done (wall clock), or null to open it again. */
+  done_at_ms?: number | null
 }
 
 /**
@@ -296,6 +298,7 @@ export function addCard(
     source,
     created_t_ms: card.t_ms ?? store.now,
     confirmed: card.confirmed ?? false,
+    done_at_ms: null,
     order_key: nextOrder(cardsIn(state, topic.id)),
   }
   store.commit('add_card', source, [

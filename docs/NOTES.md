@@ -118,7 +118,17 @@ Matt asked to keep building before his real 60-minute meeting (planned for 2026-
 - **`Ctrl+K`** (UI_SPEC §4.6): finds topics, cards and transcript lines of the open meeting. Enter on a topic or card puts that topic at the top left of the map; a line plays.
 - **A banner when the map is not being written**: if the local model does not answer, the live screen says so. Before this the map just stayed empty.
 - **Checked in the real app** (`pnpm tauri dev`, the synthetic meeting as the microphone, driven through the debugging port): a 1.5-minute meeting; a card edited and one added by hand; `Ctrl+K`; Stop → end screen with the summary already written; an owner changed there; the one-pager layout; Map and recording → a click on the waveform had the playhead up in 103 ms → Summary; Finish; Home's preview and search; the meeting reopened with its summary, layout and ticks as left.
-- **Tests**: 296 TypeScript, 67 Rust, 31 Playwright, all passing locally. `pnpm screenshot` now covers 16 states, light and dark.
+- **Tests**: 308 TypeScript, 68 Rust, 33 Playwright, all passing locally. `pnpm screenshot` now covers 18 states, light and dark.
+
+### Proposals A and B, built the same day at Matt's word ("Yes, build A and B")
+- **An action can be done.** The card editor has a **Done** tick for actions; a done action is struck through on the map. The core keeps when (`cards.done_at_ms`, migration 2).
+- **Home → Open actions.** A tab on the right of Home lists every action not yet done, across meetings, by person, oldest first, with the meeting it came from and a time that opens it there. A tick marks one done; it stays in view, struck through, until Home is opened again. A meeting that was wrapped up counts only the actions left ticked on its end screen; one that never was counts all of them.
+- **From last time.** A meeting being held shows, at the top of the right rail, the actions still open from earlier meetings with the same title (case and spaces ignored). Tick what is done; the rest will be there next time. It folds away, and is absent when nothing is owed.
+- **New meeting like this**, on a meeting in Home: the Pre-meeting sheet opens with that title, agenda and people, and offers what that meeting parked as agenda headers, one click each.
+- **Start now**, on Home: one click, no sheet; a meeting titled with the date and time, no agenda, recording.
+- **Checked in the real app** on the database from the earlier runs, which was upgraded in place: Home showed 4 open actions from the three earlier test meetings, by person; **New meeting like this** on one of them opened the sheet filled in; the new meeting showed that meeting's one open action under From last time; ticking it there left 3 on Home after Finish; **Start now** was recording one click later, titled with the time.
+- **Left out of A on purpose:** the pinned topics of the last meeting are offered in the Pre-meeting sheet, not in the live rail, because that is where the agenda is edited. "Still open" needs no button: not ticking is the answer.
+- **Not built:** nothing marks an action as late (due dates are text), and an action cannot be handed to someone else from Home (open the meeting and edit the card).
 
 ### Not verified
 - **The model-written layout, beyond one try.** Asked for "one short paragraph in plain words, then the actions as a table" on a cut of the fixture's notes, the local model answered in 42 s with a correct table and a paragraph that got a condition wrong (it wrote that the quote is 42 *if* a Q2 batch is signed; the notes say 42, or 40 if it is signed) and added dollar signs. The screen says a model wrote the text and to read it against the lists. The three built-in layouts use no model and cannot do this.

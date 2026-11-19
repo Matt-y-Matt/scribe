@@ -110,6 +110,32 @@ describe('editing a card in place', () => {
     expect(within(form).getByLabelText('Due')).toHaveValue('')
   })
 
+  it('marks an action done, shows it struck through, and opens it again', () => {
+    const store = fixtureStore({ pins: FIXTURE_PINS })
+    show(store, 'Artwork')
+    const id = Object.values(store.getState().cards).find(
+      row => row.text === 'Vector logo and mockups'
+    )?.id
+    if (!id) throw new Error('no card')
+
+    let form = openEditor('Vector logo and mockups')
+    fireEvent.click(within(form).getByRole('checkbox', { name: 'Done' }))
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    expect(store.getState().cards[id]?.done_at_ms).toEqual(expect.any(Number))
+    expect(rowOf('Vector logo and mockups')).toHaveTextContent(
+      '00:01:38 · Ant · done'
+    )
+
+    form = openEditor('Vector logo and mockups')
+    expect(within(form).getByRole('checkbox', { name: 'Done' })).toBeChecked()
+    fireEvent.click(within(form).getByRole('checkbox', { name: 'Done' }))
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    expect(store.getState().cards[id]?.done_at_ms).toBeNull()
+    // A note has nothing to be done.
+    form = openEditor(/Logo came as a WhatsApp JPG/)
+    expect(within(form).queryByRole('checkbox', { name: 'Done' })).toBeNull()
+  })
+
   it('leaves the card alone on Escape and on Cancel', () => {
     const store = fixtureStore({ pins: FIXTURE_PINS })
     show(store, 'Artwork')

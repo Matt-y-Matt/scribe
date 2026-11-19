@@ -40,6 +40,9 @@ export function CardEditor({
   const [kind, setKind] = useState<CardKind>(card?.kind ?? 'note')
   const [owner, setOwner] = useState(card?.owner ?? '')
   const [due, setDue] = useState(card?.due_text ?? '')
+  const [done, setDone] = useState(
+    card !== undefined && card.done_at_ms !== null
+  )
   const owners = useId()
   const textBox = useRef<HTMLTextAreaElement>(null)
 
@@ -64,7 +67,14 @@ export function CardEditor({
       owner: owner.trim() || null,
       due_text: due.trim() || null,
     }
-    if (card) editCard(store, card.id, fields)
+    if (card) {
+      editCard(store, card.id, {
+        ...fields,
+        // Keep the day it was done; only a change of mind changes it.
+        done_at_ms:
+          kind === 'action' && done ? (card.done_at_ms ?? Date.now()) : null,
+      })
+    }
     // A card the host writes once the meeting is over is one they vouch
     // for: it is in the summary unless they untick it.
     else {
@@ -159,6 +169,18 @@ export function CardEditor({
             className={cn(field, 'h-6 min-w-0 flex-1')}
           />
         </div>
+      )}
+
+      {card && kind === 'action' && (
+        <label className="flex items-center gap-1.5 text-secondary">
+          <input
+            type="checkbox"
+            checked={done}
+            onChange={event => setDone(event.target.checked)}
+            className="size-3.5 accent-accent"
+          />
+          Done
+        </label>
       )}
 
       <div className="flex items-center gap-1.5">

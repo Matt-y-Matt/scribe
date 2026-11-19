@@ -294,6 +294,7 @@ export function applyOps(
           source: 'engine',
           created_t_ms: startOf(cited),
           confirmed: false,
+          done_at_ms: null,
           order_key: nextOrder(cardsIn(state(), topic.id)),
         }
         const entry = store.commit(

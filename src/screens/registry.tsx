@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import {
+  HomeActions,
   HomeEmpty,
   HomeList,
   HomeSearch,
@@ -10,6 +11,7 @@ import {
 import {
   Live,
   LiveGhost,
+  LiveLastTime,
   LiveUnplanned,
   End,
   LiveZoomedOut,
@@ -25,11 +27,13 @@ export const SCREENS: Record<ScreenId, ComponentType> = {
   'home-empty': HomeEmpty,
   'home-list': HomeList,
   'home-search': HomeSearch,
+  'home-actions': HomeActions,
   premeeting: PreMeetingSheet,
   live: Live,
   'live-ghost': LiveGhost,
   'live-unplanned': LiveUnplanned,
   'live-zoomed-out': LiveZoomedOut,
+  'live-last-time': LiveLastTime,
   paused: Paused,
   'nomic-error': NoMicError,
   'model-missing': ModelMissing,

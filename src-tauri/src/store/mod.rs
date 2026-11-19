@@ -145,7 +145,19 @@ pub struct CardRow {
     pub source: ChangeSource,
     pub created_t_ms: u32,
     pub confirmed: bool,
+    /// When an action was marked done, on the wall clock; `None` while open.
+    pub done_at_ms: Option<f64>,
     pub order_key: f64,
+}
+
+/// An action nobody has marked done, with the meeting it came from: what
+/// Home lists across meetings and a new meeting shows from the last one.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct OpenAction {
+    pub card: CardRow,
+    pub meeting_title: String,
+    pub meeting_created_at_ms: f64,
+    pub topic_title: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -215,6 +227,25 @@ fn opt_ms(row: &SqliteRow, column: &str) -> Result<Option<u32>> {
     Ok(row
         .try_get::<Option<i64>, _>(column)?
         .map(|value| value.max(0) as u32))
+}
+
+fn card_from(row: &SqliteRow) -> Result<CardRow> {
+    Ok(CardRow {
+        id: row.try_get("id")?,
+        meeting_id: row.try_get("meeting_id")?,
+        topic_id: row.try_get("topic_id")?,
+        kind: CardKind::parse(row.try_get("kind")?)?,
+        text: row.try_get("text")?,
+        owner: row.try_get("owner")?,
+        due_text: row.try_get("due_text")?,
+        segment_ids: list_from(row.try_get("segment_ids_json")?),
+        status: CardStatus::parse(row.try_get("status")?)?,
+        source: ChangeSource::parse(row.try_get("source")?)?,
+        created_t_ms: ms(row, "created_t_ms")?,
+        confirmed: row.try_get::<i64, _>("confirmed")? != 0,
+        done_at_ms: wall(row, "done_at_ms")?,
+        order_key: row.try_get("order_key")?,
+    })
 }
 
 fn wall(row: &SqliteRow, column: &str) -> Result<Option<f64>> {
@@ -535,23 +566,7 @@ impl Store {
             .fetch_all(&self.pool)
             .await?
             .iter()
-            .map(|row| {
-                Ok(CardRow {
-                    id: row.try_get("id")?,
-                    meeting_id: row.try_get("meeting_id")?,
-                    topic_id: row.try_get("topic_id")?,
-                    kind: CardKind::parse(row.try_get("kind")?)?,
-                    text: row.try_get("text")?,
-                    owner: row.try_get("owner")?,
-                    due_text: row.try_get("due_text")?,
-                    segment_ids: list_from(row.try_get("segment_ids_json")?),
-                    status: CardStatus::parse(row.try_get("status")?)?,
-                    source: ChangeSource::parse(row.try_get("source")?)?,
-                    created_t_ms: ms(row, "created_t_ms")?,
-                    confirmed: row.try_get::<i64, _>("confirmed")? != 0,
-                    order_key: row.try_get("order_key")?,
-                })
-            })
+            .map(card_from)
             .collect::<Result<Vec<_>>>()?;
         let suggestions = sqlx::query("SELECT * FROM suggestions WHERE meeting_id = ? ORDER BY id")
             .bind(meeting_id)
@@ -604,8 +619,8 @@ impl Store {
         for card in &patch.cards {
             sqlx::query(
                 "INSERT OR REPLACE INTO cards (id, meeting_id, topic_id, kind, text, owner, due_text, \
-                 segment_ids_json, status, source, created_t_ms, confirmed, order_key) \
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                 segment_ids_json, status, source, created_t_ms, confirmed, done_at_ms, order_key) \
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
             .bind(&card.id)
             .bind(&card.meeting_id)
@@ -619,6 +634,7 @@ impl Store {
             .bind(card.source.as_str())
             .bind(card.created_t_ms)
             .bind(card.confirmed)
+            .bind(card.done_at_ms.map(|at| at as i64))
             .bind(card.order_key)
             .execute(&mut *tx)
             .await?;
@@ -646,6 +662,47 @@ impl Store {
             sqlx::query(sql).bind(&gone.id).execute(&mut *tx).await?;
         }
         tx.commit().await
+    }
+
+    // ---- actions across meetings -----------------------------------------
+
+    /// Every action not yet done, oldest meeting first. A meeting that has
+    /// been wrapped up counts only the actions its host left ticked; one
+    /// that never was counts them all.
+    pub async fn open_actions(&self) -> Result<Vec<OpenAction>> {
+        sqlx::query(
+            "SELECT c.*, m.title AS meeting_title, m.created_at_ms AS meeting_created_at_ms, \
+                    COALESCE(t.title, '') AS topic_title \
+             FROM cards c \
+             JOIN meetings m ON m.id = c.meeting_id \
+             LEFT JOIN topics t ON t.id = c.topic_id \
+             WHERE c.kind = 'action' AND c.status != 'dismissed' AND c.done_at_ms IS NULL \
+               AND (c.confirmed = 1 OR NOT EXISTS \
+                    (SELECT 1 FROM cards x WHERE x.meeting_id = c.meeting_id AND x.confirmed = 1)) \
+             ORDER BY m.created_at_ms, c.created_t_ms, c.id",
+        )
+        .fetch_all(&self.pool)
+        .await?
+        .iter()
+        .map(|row| {
+            Ok(OpenAction {
+                card: card_from(row)?,
+                meeting_title: row.try_get("meeting_title")?,
+                meeting_created_at_ms: row.try_get::<i64, _>("meeting_created_at_ms")? as f64,
+                topic_title: row.try_get("topic_title")?,
+            })
+        })
+        .collect()
+    }
+
+    /// Marks an action done now, or open again.
+    pub async fn set_card_done(&self, card_id: &str, done: bool) -> Result<()> {
+        sqlx::query("UPDATE cards SET done_at_ms = ? WHERE id = ?")
+            .bind(done.then(|| now_ms() as i64))
+            .bind(card_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
     // ---- highlights -----------------------------------------------------
@@ -749,8 +806,64 @@ mod tests {
             source: ChangeSource::Engine,
             created_t_ms: 4_200,
             confirmed: false,
+            done_at_ms: None,
             order_key: 1.5,
         }
+    }
+
+    #[tokio::test]
+    async fn open_actions_carry_over_until_they_are_done() {
+        let store = Store::in_memory().await.unwrap();
+        for id in ["m_1", "m_2"] {
+            store.create_meeting(id, &new_meeting(id)).await.unwrap();
+        }
+        let in_meeting = |id: &str, meeting: &str, confirmed: bool| CardRow {
+            meeting_id: meeting.to_string(),
+            confirmed,
+            ..card(id, "t_1", id)
+        };
+        let note = CardRow {
+            kind: CardKind::Note,
+            ..in_meeting("c_note", "m_1", true)
+        };
+        let dismissed = CardRow {
+            status: CardStatus::Dismissed,
+            ..in_meeting("c_gone", "m_1", true)
+        };
+        store
+            .map_save(&MapPatch {
+                topics: vec![topic("t_1", "Pricing")],
+                cards: vec![
+                    // Wrapped up: the ticked action counts, the unticked one does not.
+                    in_meeting("c_kept", "m_1", true),
+                    in_meeting("c_unticked", "m_1", false),
+                    note,
+                    dismissed,
+                    // Never wrapped up: every action counts.
+                    in_meeting("c_raw", "m_2", false),
+                ],
+                suggestions: vec![],
+                deleted: vec![],
+            })
+            .await
+            .unwrap();
+
+        let open = store.open_actions().await.unwrap();
+        let ids: Vec<&str> = open.iter().map(|row| row.card.id.as_str()).collect();
+        assert_eq!(ids, ["c_kept", "c_raw"]);
+        assert_eq!(open[0].meeting_title, "m_1");
+        assert_eq!(open[0].topic_title, "Pricing");
+
+        store.set_card_done("c_kept", true).await.unwrap();
+        let open = store.open_actions().await.unwrap();
+        assert_eq!(open.len(), 1);
+        // Done is kept with the card, and survives the map being loaded.
+        let rows = store.map_load("m_1").await.unwrap();
+        let kept = rows.cards.iter().find(|row| row.id == "c_kept").unwrap();
+        assert!(kept.done_at_ms.is_some());
+
+        store.set_card_done("c_kept", false).await.unwrap();
+        assert_eq!(store.open_actions().await.unwrap().len(), 2);
     }
 
     #[tokio::test]

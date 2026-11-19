@@ -50,6 +50,11 @@ export interface Card {
   created_t_ms: number
   /** Set on the end screen (M5), never by the engine. */
   confirmed: boolean
+  /**
+   * When an action was marked done, on the wall clock (milliseconds since
+   * 1970); null while it is open. Open actions carry over to later meetings.
+   */
+  done_at_ms: number | null
   /** Sort position inside the topic, ascending. */
   order_key: number
 }

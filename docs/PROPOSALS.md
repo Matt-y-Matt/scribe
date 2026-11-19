@@ -13,12 +13,12 @@ The test for every item: does it get an action out of the room with an owner and
 
 ## 2. Recommended, in this order
 
-### A. Actions that carry over (the follow-through loop)
+### A. Actions that carry over (the follow-through loop) — built 2026-11-19, see NOTES
 - **What.** An action can be ticked done. Home gets an "Open actions" view: every action not yet done, across meetings, grouped by person, oldest first, each with its meeting and time link. Starting a meeting with the same title as an earlier one shows "From last time" in the Pins rail: its open actions and its pinned topics, each with `Done`, `Still open`, `Add to agenda`.
 - **Why.** It closes the loop the product exists for. It also makes the first two minutes of the weekly meeting write themselves: read out last week's open actions.
 - **Cost.** One column on cards (`done_at`), one query, one Home view, one rail section. About two sessions. No model, no audio.
 
-### B. Start again
+### B. Start again — built 2026-11-19, see NOTES
 - **What.** On a past meeting in Home: `New meeting like this`. It opens the Pre-meeting sheet with that title, agenda and people filled in. Home also gets `Start now`: one click, no sheet, titled with the date, for a one-to-one that was not planned.
 - **Why.** The weekly meeting should take one click and a glance to start, not twenty seconds of typing while the room waits.
 - **Cost.** Half a session. Screens only.

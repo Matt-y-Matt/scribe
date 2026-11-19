@@ -101,6 +101,7 @@ describe('EndScreen', () => {
             source: 'engine',
             created_t_ms: 380_000,
             confirmed: false,
+            done_at_ms: null,
             order_key: 99,
           },
         },

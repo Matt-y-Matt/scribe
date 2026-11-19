@@ -60,6 +60,7 @@ function card(store: MapStore, topicId: string, text: string): Card {
     source: 'user',
     created_t_ms: 0,
     confirmed: false,
+    done_at_ms: null,
     order_key: 0,
   }
 }

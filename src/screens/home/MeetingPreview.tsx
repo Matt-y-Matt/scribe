@@ -85,6 +85,7 @@ function Row({
 export function MeetingPreview({ meeting }: { meeting: MeetingInfo }) {
   const backend = useBackend()
   const go = useApp(app => app.go)
+  const openSheet = useApp(app => app.open)
   const map = useQuery({
     queryKey: ['map', meeting.id],
     queryFn: () => backend.mapLoad(meeting.id),
@@ -116,6 +117,23 @@ export function MeetingPreview({ meeting }: { meeting: MeetingInfo }) {
             </p>
           )}
         </div>
+        <Button
+          variant="outline"
+          title="A new meeting with this title, agenda and people"
+          onClick={() =>
+            openSheet({
+              name: 'premeeting',
+              like: {
+                title: meeting.title,
+                agenda: meeting.agenda,
+                participants: meeting.participants,
+                parked: outline?.pinned.map(topic => topic.title) ?? [],
+              },
+            })
+          }
+        >
+          New meeting like this
+        </Button>
         <Button onClick={() => open()}>Open</Button>
       </header>
 

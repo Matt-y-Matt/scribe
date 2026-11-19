@@ -162,4 +162,9 @@ CREATE TABLE settings (
   value_json TEXT NOT NULL
 );
 "#,
+    // 2 — actions that carry over: when an action was marked done (wall
+    // clock, milliseconds since 1970), or NULL while it is still open.
+    r#"
+ALTER TABLE cards ADD COLUMN done_at_ms INTEGER;
+"#,
 ];

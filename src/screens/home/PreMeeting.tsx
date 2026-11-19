@@ -18,12 +18,15 @@ export function PreMeeting({
   onStart,
   onClose,
   initial,
+  parked = [],
 }: {
   /** Creates the meeting and starts recording. Rejects when it cannot. */
   onStart: (meeting: NewMeeting) => Promise<void>
   onClose: () => void
   /** What the sheet opens with: the `?screen=premeeting` fixture. */
   initial?: Partial<NewMeeting>
+  /** Topics the meeting this one follows left pinned. */
+  parked?: readonly string[]
 }) {
   const [title, setTitle] = useState(initial?.title ?? '')
   const [agenda, setAgenda] = useState<string[]>(initial?.agenda ?? [])
@@ -134,6 +137,27 @@ export function PreMeeting({
             Each header becomes a column on the map. A meeting with no agenda is
             fine.
           </p>
+          {parked.some(topic => !agenda.includes(topic)) && (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className="text-meta text-text-muted">
+                Parked last time:
+              </span>
+              {parked
+                .filter(topic => !agenda.includes(topic))
+                .map(topic => (
+                  <button
+                    key={topic}
+                    type="button"
+                    disabled={full}
+                    title="Add to the agenda"
+                    className="flex h-6 items-center gap-1 rounded-md border border-dashed border-pin px-2 text-secondary hover:bg-surface-2 disabled:opacity-50"
+                    onClick={() => setAgenda([...agenda, topic])}
+                  >
+                    + {topic}
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
 
         <label className="flex flex-col gap-1">

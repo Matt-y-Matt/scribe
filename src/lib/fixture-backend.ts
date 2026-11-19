@@ -4,6 +4,7 @@ import type {
   MapRows,
   MeetingInfo,
   ModelDownload,
+  OpenAction,
   ModelInfo,
   RecordingState,
   SegmentFinal,
@@ -123,6 +124,47 @@ export function fixtureBackend(overrides: Partial<FixtureData> = {}): Backend {
       data.summaries[meetingId] ?? { markdown: null, layout: null },
     saveSummary: async (meetingId, summary) => {
       data.summaries[meetingId] = summary
+    },
+
+    openActions: async () => {
+      const open: OpenAction[] = []
+      const oldestFirst = [...data.meetings].sort(
+        (a, b) => a.created_at_ms - b.created_at_ms
+      )
+      for (const row of oldestFirst) {
+        const map = data.maps[row.id]
+        if (!map) continue
+        // Wrapped up: only what the host left ticked. Never wrapped: all.
+        const wrapped = map.cards.some(card => card.confirmed)
+        for (const card of map.cards) {
+          if (card.kind !== 'action' || card.status === 'dismissed') continue
+          if (card.done_at_ms !== null || (wrapped && !card.confirmed)) continue
+          open.push({
+            card,
+            meeting_title: row.title,
+            meeting_created_at_ms: row.created_at_ms,
+            topic_title:
+              map.topics.find(topic => topic.id === card.topic_id)?.title ?? '',
+          })
+        }
+      }
+      return open.sort(
+        (a, b) =>
+          a.meeting_created_at_ms - b.meeting_created_at_ms ||
+          a.card.created_t_ms - b.card.created_t_ms
+      )
+    },
+    setCardDone: async (cardId, isDone) => {
+      for (const [meetingId, map] of Object.entries(data.maps)) {
+        data.maps[meetingId] = {
+          ...map,
+          cards: map.cards.map(card =>
+            card.id === cardId
+              ? { ...card, done_at_ms: isDone ? Date.now() : null }
+              : card
+          ),
+        }
+      }
     },
 
     listDevices: async () => data.devices,

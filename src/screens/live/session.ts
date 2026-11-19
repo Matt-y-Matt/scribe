@@ -1,5 +1,5 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
-import type { Highlight, RecState, SegmentFinal } from '@/ipc'
+import type { Highlight, OpenAction, RecState, SegmentFinal } from '@/ipc'
 
 // What the live screen knows about the meeting besides its map: whether it
 // is being recorded, the transcript, the levels, the waveform, playback.
@@ -41,6 +41,13 @@ export interface SessionState {
   peaks: readonly number[]
   playback: { playing: boolean; tMs: number }
   highlights: readonly Highlight[]
+  /**
+   * Actions still open from earlier meetings with this meeting's title:
+   * what the host reads out first. Empty in review.
+   */
+  lastTime: readonly OpenAction[]
+  /** The ones of those ticked done since this meeting was opened. */
+  lastTimeDone: readonly string[]
 }
 
 export interface SessionActions {
@@ -59,6 +66,8 @@ export interface SessionActions {
   addHighlight(t0Ms: number, t1Ms: number, label: string): void
   removeHighlight(highlightId: string): void
   openSettings(tab: 'audio' | 'speech'): void
+  /** Marks an action from an earlier meeting done, or open again. */
+  setDone(cardId: string, done: boolean): void
   /** To the end screen: confirm who owes what, write the summary. */
   wrapUp(): void
   /** Back from the end screen to the map and the recording. */
@@ -90,6 +99,8 @@ export const emptySession = (
   peaks: [],
   playback: { playing: false, tMs: 0 },
   highlights: [],
+  lastTime: [],
+  lastTimeDone: [],
 })
 
 export function createSessionStore(initial: SessionState): SessionStore {
@@ -136,6 +147,7 @@ export const idleActions: SessionActions = {
   addHighlight: noop,
   removeHighlight: noop,
   openSettings: noop,
+  setDone: noop,
   wrapUp: noop,
   showMap: noop,
   leave: noop,

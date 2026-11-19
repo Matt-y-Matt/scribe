@@ -14,8 +14,19 @@ export type Route =
 
 export type SettingsTab = 'audio' | 'speech'
 
+/** A past meeting to start the next one from. */
+export interface MeetingLike {
+  title: string
+  agenda: string[]
+  participants: string[]
+  /** What that meeting parked: offered as agenda headers. */
+  parked: string[]
+}
+
 export type Sheet =
-  { name: 'premeeting' } | { name: 'settings'; tab: SettingsTab } | null
+  | { name: 'premeeting'; like?: MeetingLike }
+  | { name: 'settings'; tab: SettingsTab }
+  | null
 
 interface AppState {
   route: Route

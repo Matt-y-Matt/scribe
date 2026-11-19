@@ -13,6 +13,7 @@ import {
 } from './live-context'
 import { COLLAPSE_ZOOM, MapCanvas } from './MapCanvas'
 import { Palette } from './Palette'
+import { LastTime } from './LastTime'
 import { PinsRail } from './PinsRail'
 import type { SessionActions, SessionStore } from './session'
 import { StatusStrip } from './StatusStrip'
@@ -243,6 +244,7 @@ export function LiveScreen({
               aria-label="Pins and transcript"
               className="flex w-[320px] shrink-0 flex-col border-l bg-surface"
             >
+              <LastTime />
               <PinsRail />
               <TranscriptPanel />
             </aside>

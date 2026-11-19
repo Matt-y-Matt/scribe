@@ -21,6 +21,10 @@ import {
 // recording when the host pressed Start, and from then on keeps the screen's
 // session and the map engine fed from the core's events.
 
+/** "Custore weekly" this week is "custore weekly " last week. */
+const sameTitle = (a: string, b: string) =>
+  a.trim().toLowerCase() === b.trim().toLowerCase()
+
 export interface RunningMeeting {
   store: MapStore
   session: SessionStore
@@ -36,7 +40,7 @@ export async function openMeeting(
   openSettings: (tab: 'audio' | 'speech') => void
 ): Promise<RunningMeeting> {
   const prefs = currentPrefs()
-  const [meeting, rows, segments, peaks, highlights, models, recording] =
+  const [meeting, rows, segments, peaks, highlights, models, recording, open] =
     await Promise.all([
       backend.getMeeting(meetingId),
       backend.mapLoad(meetingId),
@@ -45,6 +49,8 @@ export async function openMeeting(
       backend.listHighlights(meetingId),
       backend.listModels(),
       backend.recordingState(),
+      // Not worth failing to open a meeting over.
+      backend.openActions().catch(() => []),
     ])
 
   const store = new MapStore({
@@ -85,6 +91,17 @@ export async function openMeeting(
     segments,
     peaks,
     highlights,
+    // A meeting being held, not one being read: what is still owed from
+    // the earlier meetings of the same name.
+    lastTime:
+      here || fresh
+        ? open.filter(
+            row =>
+              row.card.meeting_id !== meetingId &&
+              row.meeting_created_at_ms <= meeting.created_at_ms &&
+              sameTitle(row.meeting_title, meeting.title)
+          )
+        : [],
   })
   store.tick(session.getState().elapsedMs)
 
@@ -219,6 +236,14 @@ export async function openMeeting(
       quietly(backend.deleteHighlight(highlightId), 'highlight not removed')
     },
     openSettings,
+    setDone: (cardId, isDone) => {
+      session.setState(state => ({
+        lastTimeDone: isDone
+          ? [...state.lastTimeDone.filter(id => id !== cardId), cardId]
+          : state.lastTimeDone.filter(id => id !== cardId),
+      }))
+      quietly(backend.setCardDone(cardId, isDone), 'done not saved')
+    },
     wrapUp: () => {
       quietly(backend.stopPlayback(), 'stop failed')
       session.setState({ view: 'wrap' })

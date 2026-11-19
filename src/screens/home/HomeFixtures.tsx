@@ -23,7 +23,8 @@ import { PreMeeting } from './PreMeeting'
 function fixtureHome(
   data: Partial<FixtureData>,
   sheet: Sheet = null,
-  search = ''
+  search = '',
+  pane: 'meeting' | 'actions' = 'meeting'
 ) {
   return function HomeFixture() {
     const [backend] = useState(() =>
@@ -47,10 +48,11 @@ function fixtureHome(
       <QueryClientProvider client={client}>
         <BackendContext value={backend}>
           <div className="relative h-full">
-            <Home initialSearch={search} />
+            <Home initialSearch={search} initialPane={pane} />
             {sheet?.name === 'premeeting' && (
               <PreMeeting
                 initial={PREMEETING_DRAFT}
+                parked={['Office aircon', 'Christmas pop-up']}
                 onStart={async () => undefined}
                 onClose={close}
               />
@@ -76,6 +78,14 @@ export const HomeSearch = fixtureHome(
   { meetings: FIXTURE_MEETINGS },
   null,
   'landlord'
+)
+
+/** Everything still owed across meetings, by person. */
+export const HomeActions = fixtureHome(
+  { meetings: FIXTURE_MEETINGS },
+  null,
+  '',
+  'actions'
 )
 
 /** New meeting pressed: the Pre-meeting sheet, filled in. */

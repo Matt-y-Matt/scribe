@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils'
 import { clock } from '../live/format'
 import { Settings } from '../settings/Settings'
 import { MeetingPreview } from './MeetingPreview'
+import { useDoneTicks } from './open-actions'
+import { OpenActions } from './OpenActions'
 import { matchesMeeting } from './outline'
 import { PreMeeting } from './PreMeeting'
 
@@ -21,6 +23,13 @@ const day = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
   month: 'short',
   year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+const now = new Intl.DateTimeFormat(undefined, {
+  day: 'numeric',
+  month: 'short',
   hour: '2-digit',
   minute: '2-digit',
 })
@@ -123,7 +132,10 @@ function MeetingRow({
 
 export function Home({
   initialSearch = '',
+  initialPane = 'meeting',
 }: {
+  /** What the right side opens on: the `?screen=home-actions` fixture. */
+  initialPane?: 'meeting' | 'actions'
   /** What the search box opens with: the `?screen=home-search` fixture. */
   initialSearch?: string
 }) {
@@ -134,6 +146,9 @@ export function Home({
   const [later, setLater] = useState<string[]>([])
   const [chosen, setChosen] = useState<string | null>(null)
   const [typed, setTyped] = useState(initialSearch)
+  const [pane, setPane] = useState(initialPane)
+  const [startFailed, setStartFailed] = useState(false)
+  const ticks = useDoneTicks()
   const query = useDeferredValue(typed.trim())
   const searching = query.length >= MIN_QUERY
 
@@ -141,6 +156,12 @@ export function Home({
     queryKey: ['meetings'],
     queryFn: () => backend.listMeetings(),
     staleTime: 0,
+  })
+  const owed = useQuery({
+    queryKey: ['open-actions'],
+    queryFn: () => backend.openActions(),
+    staleTime: 0,
+    gcTime: 0,
   })
   const unfinished = useQuery({
     queryKey: ['unfinished'],
@@ -172,6 +193,20 @@ export function Home({
     const created = await backend.createMeeting(meeting)
     go({ name: 'meeting', meetingId: created.id, start: true })
   }
+
+  // One click, no sheet: a meeting that was not planned.
+  const startNow = () => {
+    setStartFailed(false)
+    start({
+      title: `Meeting, ${now.format(Date.now())}`,
+      agenda: [],
+      mode: 'group',
+      participants: [],
+    }).catch(() => setStartFailed(true))
+  }
+  const stillOwed = (owed.data ?? []).filter(
+    row => !ticks.done.includes(row.card.id)
+  ).length
 
   const toRecover = (unfinished.data ?? []).filter(
     meeting => !later.includes(meeting.id)
@@ -218,10 +253,22 @@ export function Home({
           >
             <SettingsIcon size={16} aria-hidden />
           </button>
+          <Button
+            variant="outline"
+            title="Start recording now, with no agenda"
+            onClick={startNow}
+          >
+            Start now
+          </Button>
           <Button onClick={() => open({ name: 'premeeting' })}>
             New meeting
           </Button>
         </div>
+        {startFailed && (
+          <p role="alert" className="text-body">
+            The meeting could not be started. Try again.
+          </p>
+        )}
 
         {all.length > 0 && (
           <label className="flex h-7 items-center gap-2 rounded-md border bg-surface px-2 focus-within:border-accent">
@@ -325,9 +372,12 @@ export function Home({
               <MeetingRow
                 key={meeting.id}
                 meeting={meeting}
-                selected={meeting.id === selected?.id}
+                selected={pane === 'meeting' && meeting.id === selected?.id}
                 lines={linesBy.get(meeting.id) ?? []}
-                onSelect={() => setChosen(meeting.id)}
+                onSelect={() => {
+                  setChosen(meeting.id)
+                  setPane('meeting')
+                }}
               />
             ))}
           </ul>
@@ -337,11 +387,63 @@ export function Home({
         aria-label="Summary preview"
         className="min-w-0 flex-1 overflow-y-auto"
       >
-        {selected && <MeetingPreview key={selected.id} meeting={selected} />}
+        {all.length > 0 && (
+          <div
+            role="tablist"
+            aria-label="What to show"
+            className="flex h-10 items-center gap-1 border-b bg-surface px-4"
+          >
+            {(
+              [
+                ['meeting', 'Meeting'],
+                ['actions', `Open actions (${stillOwed})`],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={pane === id}
+                className={cn(
+                  'h-6 rounded-md border px-2 text-secondary transition-opacity duration-150 ease-out',
+                  pane === id
+                    ? 'border-accent bg-accent-soft font-semibold'
+                    : 'border-transparent hover:bg-surface-2'
+                )}
+                onClick={() => setPane(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {pane === 'actions' && all.length > 0 ? (
+          owed.isError ? (
+            <p role="alert" className="p-6 text-body">
+              The open actions could not be read.
+            </p>
+          ) : (
+            owed.data && (
+              <OpenActions
+                open={owed.data}
+                done={ticks.done}
+                onDone={ticks.onDone}
+              />
+            )
+          )
+        ) : (
+          selected && <MeetingPreview key={selected.id} meeting={selected} />
+        )}
       </section>
 
       {sheet?.name === 'premeeting' && (
-        <PreMeeting onStart={start} onClose={close} />
+        <PreMeeting
+          key={sheet.like?.title ?? ''}
+          onStart={start}
+          onClose={close}
+          initial={sheet.like}
+          parked={sheet.like?.parked}
+        />
       )}
       {sheet?.name === 'settings' && (
         <Settings

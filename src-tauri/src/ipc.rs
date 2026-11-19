@@ -21,7 +21,7 @@ use crate::session::{
     StartOptions,
 };
 use crate::state::AppState;
-use crate::store::{Highlight, MapPatch, MapRows, MeetingInfo, NewMeeting, Summary};
+use crate::store::{Highlight, MapPatch, MapRows, MeetingInfo, NewMeeting, OpenAction, Summary};
 use crate::stt::models::{self, Downloader};
 
 /// `segment:final` — one finished utterance of the meeting transcript.
@@ -180,6 +180,24 @@ pub async fn save_summary(
     summary: Summary,
 ) -> CommandResult<()> {
     Ok(state.store.save_summary(&meeting_id, &summary).await?)
+}
+
+/// Every action not yet marked done, across meetings, oldest first.
+#[tauri::command]
+#[specta::specta]
+pub async fn open_actions(state: State<'_, AppState>) -> CommandResult<Vec<OpenAction>> {
+    Ok(state.store.open_actions().await?)
+}
+
+/// Marks an action done, or open again, without its meeting being open.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_card_done(
+    state: State<'_, AppState>,
+    card_id: String,
+    done: bool,
+) -> CommandResult<()> {
+    Ok(state.store.set_card_done(&card_id, done).await?)
 }
 
 // ---- recording ------------------------------------------------------------
@@ -540,6 +558,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             get_meeting,
             get_summary,
             save_summary,
+            open_actions,
+            set_card_done,
             start,
             pause,
             resume,

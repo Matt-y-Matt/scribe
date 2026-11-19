@@ -297,6 +297,57 @@ test.describe('the end of a meeting', () => {
   })
 })
 
+test.describe('actions that carry over', () => {
+  test('last time’s open actions lead the rail, and a tick marks one done', async ({
+    page,
+  }) => {
+    const errors = await open(page, 'live-last-time')
+    const rail = page.getByRole('region', { name: /FROM LAST TIME/ })
+    await expect(rail).toContainText('3 open')
+    await rail
+      .getByRole('checkbox', { name: 'Done: Chase UDO for the signed PO' })
+      .check()
+    await expect(rail).toContainText('2 open')
+    await expect(rail.getByText('Chase UDO for the signed PO')).toHaveCSS(
+      'text-decoration-line',
+      'line-through'
+    )
+    // The pins and the transcript are still there under it.
+    await expect(page.getByRole('region', { name: /^PINS/ })).toBeVisible()
+    await expect(transcript(page)).toBeVisible()
+    expect(errors).toEqual([])
+  })
+
+  test('Home lists what is owed by person; New meeting like this fills the sheet', async ({
+    page,
+  }) => {
+    await page.goto('/?screen=home-list')
+    await page.getByRole('tab', { name: 'Open actions (11)' }).click()
+    const zach = page.getByRole('region', { name: 'Zach' })
+    await expect(zach).toContainText('3 open')
+    await zach
+      .getByRole('checkbox', { name: 'Done: Draft the two options for UDO' })
+      .check()
+    await expect(zach).toContainText('2 open')
+    await expect(
+      page.getByRole('tab', { name: 'Open actions (10)' })
+    ).toBeVisible()
+
+    await page
+      .getByRole('button', { name: /Custore weekly team meeting/ })
+      .click()
+    await page.getByRole('button', { name: 'New meeting like this' }).click()
+    const sheet = page.getByRole('dialog', { name: 'New meeting' })
+    await expect(sheet.getByPlaceholder('Weekly team meeting')).toHaveValue(
+      'Custore weekly team meeting'
+    )
+    await sheet.getByRole('button', { name: '+ Office aircon' }).click()
+    await expect(
+      sheet.getByRole('list', { name: 'Agenda headers' })
+    ).toContainText('Office aircon')
+  })
+})
+
 test.describe('states', () => {
   test('with no microphone the screen says so and offers a way out', async ({
     page,

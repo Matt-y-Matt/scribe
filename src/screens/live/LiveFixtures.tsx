@@ -14,7 +14,8 @@ import { installTestHook } from './test-hook'
 function fixtureScreen(
   options: FixtureOptions,
   zoom?: number,
-  mode: FixtureMode = 'recording'
+  mode: FixtureMode = 'recording',
+  lastTime = false
 ) {
   return function LiveFixture() {
     const [store] = useState(() =>
@@ -27,7 +28,7 @@ function fixtureScreen(
         : fixtureStore(options)
     )
     const [{ session, actions }] = useState(() =>
-      fixtureSession({ until: options.until, mode })
+      fixtureSession({ until: options.until, mode, lastTime })
     )
     // The end screen reads and saves the summary: a core that is not there.
     const [backend] = useState(() =>
@@ -78,6 +79,14 @@ export const LiveUnplanned = fixtureScreen({ until: 's026' })
 
 /** Below zoom 0.7: cards collapse to kind icons with counts. */
 export const LiveZoomedOut = fixtureScreen({ pins: FIXTURE_PINS }, 0.55)
+
+/** Two minutes in, with last week's open actions at the top of the rail. */
+export const LiveLastTime = fixtureScreen(
+  { until: 's012' },
+  undefined,
+  'recording',
+  true
+)
 
 /** Paused mid-meeting: the indicator is grey and nothing is captured. */
 export const Paused = fixtureScreen({ until: 's022' }, undefined, 'paused')

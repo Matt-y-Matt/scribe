@@ -15,6 +15,43 @@ const addHeader = (title: string) => {
   fireEvent.keyDown(header(), { key: 'Enter' })
 }
 
+describe('PreMeeting, following an earlier meeting', () => {
+  it('opens filled in, and a parked topic joins the agenda on a click', async () => {
+    const onStart = vi.fn(async (_meeting: NewMeeting) => undefined)
+    render(
+      <PreMeeting
+        onStart={onStart}
+        onClose={() => undefined}
+        initial={{
+          title: 'Custore weekly',
+          agenda: ['CLA quote'],
+          participants: ['Matt', 'Kabs'],
+        }}
+        parked={['Office aircon', 'Christmas pop-up']}
+      />
+    )
+    expect(screen.getByPlaceholderText('Weekly team meeting')).toHaveValue(
+      'Custore weekly'
+    )
+    fireEvent.click(screen.getByRole('button', { name: '+ Office aircon' }))
+    // Once on the agenda it is no longer on offer.
+    expect(screen.queryByRole('button', { name: '+ Office aircon' })).toBeNull()
+    expect(
+      screen.getByRole('button', { name: '+ Christmas pop-up' })
+    ).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start recording' }))
+    await waitFor(() =>
+      expect(onStart).toHaveBeenCalledWith({
+        title: 'Custore weekly',
+        agenda: ['CLA quote', 'Office aircon'],
+        mode: 'group',
+        participants: ['Matt', 'Kabs'],
+      })
+    )
+  })
+})
+
 describe('PreMeeting', () => {
   it('starts a meeting with its title, agenda and people', async () => {
     const { onStart } = show()

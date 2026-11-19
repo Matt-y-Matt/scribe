@@ -31,14 +31,21 @@ export function CardFace({ card }: { card: Card }) {
   const meta = [
     clock(card.created_t_ms),
     card.owner,
-    card.due_text && `due ${card.due_text}`,
+    card.done_at_ms !== null ? 'done' : card.due_text && `due ${card.due_text}`,
   ].filter(Boolean)
   return (
     <>
       <KindIcon kind={card.kind} className="mt-[3px]" />
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
-          <p className="min-w-0 flex-1 text-body">{card.text}</p>
+          <p
+            className={cn(
+              'min-w-0 flex-1 text-body',
+              card.done_at_ms !== null && 'text-text-muted line-through'
+            )}
+          >
+            {card.text}
+          </p>
           {card.kind === 'action' && card.owner && (
             <OwnerChip name={card.owner} />
           )}

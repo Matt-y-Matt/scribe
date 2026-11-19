@@ -57,6 +57,28 @@ async saveSummary(meetingId: string, summary: Summary) : Promise<Result<null, Ap
     else return { status: "error", error: e  as any };
 }
 },
+/**
+ * Every action not yet marked done, across meetings, oldest first.
+ */
+async openActions() : Promise<Result<OpenAction[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("open_actions") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Marks an action done, or open again, without its meeting being open.
+ */
+async setCardDone(cardId: string, done: boolean) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_card_done", { cardId, done }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
 async start(meetingId: string, options: StartOptions) : Promise<Result<RecordingState, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("start", { meetingId, options }) };
@@ -336,7 +358,11 @@ export type CaptureStatus = {
  */
 source: string; ok: boolean }
 export type CardKind = "note" | "decision" | "action" | "research" | "quote"
-export type CardRow = { id: string; meeting_id: string; topic_id: string; kind: CardKind; text: string; owner: string | null; due_text: string | null; segment_ids: string[]; status: CardStatus; source: ChangeSource; created_t_ms: number; confirmed: boolean; order_key: number }
+export type CardRow = { id: string; meeting_id: string; topic_id: string; kind: CardKind; text: string; owner: string | null; due_text: string | null; segment_ids: string[]; status: CardStatus; source: ChangeSource; created_t_ms: number; confirmed: boolean; 
+/**
+ * When an action was marked done, on the wall clock; `None` while open.
+ */
+done_at_ms: number | null; order_key: number }
 export type CardStatus = "proposed" | "accepted" | "dismissed"
 /**
  * Who made a change to the map.
@@ -401,6 +427,11 @@ agenda: string[]; mode: MeetingMode;
  * Names of the people expected, for owner matching.
  */
 participants: string[] }
+/**
+ * An action nobody has marked done, with the meeting it came from: what
+ * Home lists across meetings and a new meeting shows from the last one.
+ */
+export type OpenAction = { card: CardRow; meeting_title: string; meeting_created_at_ms: number; topic_title: string }
 /**
  * `playback:state` — where the playhead is, about ten times a second while
  * playing, and once when playing stops.

@@ -14,6 +14,7 @@ import {
   type ModelDownload,
   type ModelInfo,
   type NewMeeting,
+  type OpenAction,
   type PlaybackState,
   type RecordingState,
   type Recovered,
@@ -38,6 +39,10 @@ export interface Backend {
   /** The written summary; both fields null until one has been saved. */
   getSummary(meetingId: string): Promise<Summary>
   saveSummary(meetingId: string, summary: Summary): Promise<void>
+  /** Every action not yet done, across meetings, oldest meeting first. */
+  openActions(): Promise<OpenAction[]>
+  /** Marks an action done, or open again, without its meeting being open. */
+  setCardDone(cardId: string, done: boolean): Promise<void>
 
   listDevices(): Promise<Devices>
   listModels(): Promise<ModelInfo[]>
@@ -137,6 +142,8 @@ export const tauriBackend: Backend = {
   getSummary: meetingId => ok(commands.getSummary(meetingId)),
   saveSummary: (meetingId, summary) =>
     done(commands.saveSummary(meetingId, summary)),
+  openActions: () => ok(commands.openActions()),
+  setCardDone: (cardId, isDone) => done(commands.setCardDone(cardId, isDone)),
 
   listDevices: () => ok(commands.listDevices()),
   listModels: () => ok(commands.listModels()),

@@ -8,7 +8,7 @@ import {
 import { afterEach, describe, expect, it } from 'vitest'
 import { useApp } from '@/lib/app-state'
 import { FIXTURE_MEETINGS } from './home-fixture-data'
-import { HomeEmpty, HomeList } from './HomeFixtures'
+import { HomeActions, HomeEmpty, HomeList } from './HomeFixtures'
 
 afterEach(() => useApp.setState({ route: { name: 'home' }, sheet: null }))
 
@@ -176,6 +176,82 @@ describe('Home', () => {
     ).toBeVisible()
     fireEvent.keyDown(box, { key: 'Escape' })
     expect(await screen.findByRole('list', { name: 'Meetings' })).toBeVisible()
+  })
+
+  it('lists every open action by person, and a tick marks one done', async () => {
+    render(<HomeList />)
+    const tab = await screen.findByRole('tab', { name: 'Open actions (11)' })
+    fireEvent.click(tab)
+    expect(tab).toHaveAttribute('aria-selected', 'true')
+
+    const kabs = await screen.findByRole('region', { name: 'Kabs' })
+    expect(kabs).toHaveTextContent('3 open')
+    expect(kabs).toHaveTextContent('Call Ross and confirm the real headcount')
+    expect(kabs).toHaveTextContent(
+      /due tomorrow · Custore weekly team meeting, .* · 00:01:12/
+    )
+
+    const box = within(kabs).getByRole('checkbox', {
+      name: 'Done: Get the Pantone from Ross',
+    })
+    fireEvent.click(box)
+    expect(box).toBeChecked()
+    expect(kabs).toHaveTextContent('2 open')
+    // It stays in sight, so a slip can be undone; the count moves at once.
+    expect(screen.getByRole('tab', { name: 'Open actions (10)' })).toBeVisible()
+
+    // A time opens the meeting it was said in, at that moment.
+    fireEvent.click(within(kabs).getByRole('button', { name: '00:01:12' }))
+    expect(useApp.getState().route).toEqual({
+      name: 'meeting',
+      meetingId: 'm_3',
+      atMs: 72_200,
+    })
+  })
+
+  it('goes back to the meeting when one is picked from the list', async () => {
+    render(<HomeActions />)
+    expect(await screen.findByRole('region', { name: 'Matt' })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /UDO order review/ }))
+    expect(
+      await screen.findByRole('heading', { name: 'UDO order review' })
+    ).toBeVisible()
+    expect(screen.getByRole('tab', { name: 'Meeting' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+  })
+
+  it('starts a new meeting like a past one, with what it parked on offer', async () => {
+    render(<HomeList />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Custore weekly team meeting/ })
+    )
+    await screen.findByRole('region', { name: 'Pinned' })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'New meeting like this' })
+    )
+    expect(useApp.getState().sheet).toEqual({
+      name: 'premeeting',
+      like: {
+        title: 'Custore weekly team meeting',
+        agenda: ['CLA quote', 'Supplier delays', 'Designer hire'],
+        participants: ['Matt', 'Zach', 'Ant', 'Kabs'],
+        parked: ['Office aircon', 'Christmas pop-up'],
+      },
+    })
+  })
+
+  it('Start now records at once, with no sheet and no agenda', async () => {
+    render(<HomeList />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Start now' }))
+    await waitFor(() =>
+      expect(useApp.getState().route).toMatchObject({
+        name: 'meeting',
+        start: true,
+      })
+    )
+    expect(useApp.getState().sheet).toBeNull()
   })
 
   it('opens the Pre-meeting sheet from New meeting', async () => {
