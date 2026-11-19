@@ -81,6 +81,19 @@ async saveSummary(meetingId: string, summary: Summary) : Promise<Result<null, Ap
 }
 },
 /**
+ * Asks where to save a text file and writes it there. The place is chosen
+ * by the person in Windows' own Save dialog, never by the page. Returns the
+ * path written, or nothing when the dialog was closed.
+ */
+async saveTextAs(fileName: string, text: string) : Promise<Result<string | null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("save_text_as", { fileName, text }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * Every action not yet marked done, across meetings, oldest first.
  */
 async openActions() : Promise<Result<OpenAction[], AppError>> {

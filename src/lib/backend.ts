@@ -40,6 +40,11 @@ export interface Backend {
    * Rejects with `busy` for the meeting being recorded.
    */
   deleteMeeting(meetingId: string): Promise<void>
+  /**
+   * Opens Windows' Save dialog and writes `text` where the person says.
+   * Resolves with the path written, or null when the dialog was closed.
+   */
+  saveTextAs(fileName: string, text: string): Promise<string | null>
   unfinishedMeetings(): Promise<MeetingInfo[]>
   recoverMeeting(meetingId: string, modelId: string): Promise<Recovered>
   /** The written summary; both fields null until one has been saved. */
@@ -145,6 +150,7 @@ export const tauriBackend: Backend = {
   renameMeeting: (meetingId, title) =>
     ok(commands.renameMeeting(meetingId, title)),
   deleteMeeting: meetingId => done(commands.deleteMeeting(meetingId)),
+  saveTextAs: (fileName, text) => ok(commands.saveTextAs(fileName, text)),
   unfinishedMeetings: () => ok(commands.unfinishedMeetings()),
   recoverMeeting: (meetingId, modelId) =>
     ok(commands.recoverMeeting(meetingId, modelId)),

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   acceptSuggestion,
   addCard,
+  addHeader,
   addTopic,
   deleteCard,
   deleteTopic,
@@ -20,6 +21,7 @@ import {
 import { applyOps } from './apply'
 import {
   cardsIn,
+  headersOf,
   openSuggestions,
   pinnedTopics,
   topicsUnder,
@@ -244,6 +246,47 @@ describe('cards', () => {
     store.undo()
     expect(texts(pricing.id)).toEqual(['First', 'Second'])
     expect(store.getState().cards[first.id]).toEqual(first)
+  })
+})
+
+describe('headers', () => {
+  it('adds one at the end of the agenda, with Unplanned still last', () => {
+    const { store } = setUp()
+    const before = headersOf(store.getState()).map(header => header.title)
+
+    store.tick(125_000)
+    const added = addHeader(store, '  Any other business ')
+    expect(added).toMatchObject({
+      title: 'Any other business',
+      kind: 'header',
+      parent_id: null,
+      off_agenda: false,
+      created_t_ms: 125_000,
+    })
+    expect(headersOf(store.getState()).map(header => header.title)).toEqual([
+      ...before.slice(0, -1),
+      'Any other business',
+      'Unplanned',
+    ])
+    // A topic can go under it like under any header.
+    expect(addTopic(store, added?.id ?? '', 'Parking')).not.toBeNull()
+
+    store.undo()
+    store.undo()
+    expect(headersOf(store.getState()).map(header => header.title)).toEqual(
+      before
+    )
+  })
+
+  it('gives back the header the agenda already has, and refuses an empty title', () => {
+    const { store, cla } = setUp()
+    const count = headersOf(store.getState()).length
+    expect(addHeader(store, 'cla QUOTE')?.id).toBe(cla.id)
+    expect(addHeader(store, 'unplanned')?.id).toBe(
+      unplannedHeader(store.getState())?.id
+    )
+    expect(addHeader(store, '   ')).toBeNull()
+    expect(headersOf(store.getState())).toHaveLength(count)
   })
 })
 

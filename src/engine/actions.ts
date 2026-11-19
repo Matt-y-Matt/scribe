@@ -1,5 +1,6 @@
 import {
   cardsIn,
+  headersOf,
   openSuggestions,
   topicsUnder,
   type Card,
@@ -323,6 +324,53 @@ export function deleteCard(
     ...orphans,
     { entity: 'card', id: card.id, before: card, after: null },
   ])
+}
+
+/**
+ * Adds a header at the end of the agenda, before the Unplanned column. A
+ * title the map already has as a header gives that header back, so the
+ * model is never left with two columns of one name.
+ */
+export function addHeader(
+  store: MapStore,
+  title: string,
+  source: Exclude<Source, 'engine'> = 'user'
+): Topic | null {
+  const wanted = title.trim()
+  if (wanted === '') return null
+  const state = store.getState()
+  const headers = headersOf(state)
+  const same = headers.find(
+    header => header.title.toLowerCase() === wanted.toLowerCase()
+  )
+  if (same) return same
+
+  const order = nextOrder(headers.filter(header => !header.off_agenda))
+  const row: Topic = {
+    id: store.ids('t'),
+    meeting_id: state.meeting.id,
+    parent_id: null,
+    title: wanted,
+    kind: 'header',
+    order_key: order,
+    status: 'active',
+    off_agenda: false,
+    created_t_ms: store.now,
+    pinned_t_ms: null,
+    revisited_t_ms: null,
+    scheduled_t_ms: null,
+    segment_ids: [],
+  }
+  store.commit('add_topic', source, [
+    { entity: 'topic', id: row.id, before: null, after: row },
+    // Unplanned stays last.
+    ...headers
+      .filter(header => header.off_agenda && header.order_key <= order)
+      .map((header, index) =>
+        topicChange(header, { order_key: order + 1 + index })
+      ),
+  ])
+  return row
 }
 
 export function addTopic(

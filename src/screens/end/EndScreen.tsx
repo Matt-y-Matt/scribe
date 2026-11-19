@@ -182,6 +182,7 @@ export function EndScreen({
                 meta={meta}
                 initial={saved.data}
                 ask={body => backend.ollamaChat(body)}
+                saveAs={(fileName, text) => backend.saveTextAs(fileName, text)}
                 onSave={summary => {
                   backend
                     .saveSummary(meetingId, summary)

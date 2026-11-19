@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { headersOf } from '@/engine/model'
 import { fixtureStore } from './fixture'
 import { fixtureSession, type FixtureMode } from './fixture-session'
 import { LiveHarness } from './harness'
@@ -12,9 +13,10 @@ function show(mode: FixtureMode = 'recording') {
   const stop = vi.fn()
   const openSettings = vi.fn()
   const focused: string[] = []
+  const store = fixtureStore({ until: 's010' })
   render(
     <LiveHarness
-      store={fixtureStore({ until: 's010' })}
+      store={store}
       session={session}
       actions={{ ...actions, pause, resume, stop, openSettings }}
       onFocusHeader={id => focused.push(id)}
@@ -22,7 +24,7 @@ function show(mode: FixtureMode = 'recording') {
       <StatusStrip />
     </LiveHarness>
   )
-  return { session, pause, resume, stop, openSettings, focused }
+  return { session, store, pause, resume, stop, openSettings, focused }
 }
 
 const indicator = () => screen.getByTestId('indicator')
@@ -30,6 +32,61 @@ const indicator = () => screen.getByTestId('indicator')
 describe('StatusStrip', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
+
+  it('adds an agenda header from the "+", and shows it on the map', () => {
+    const { store, focused } = show()
+    const agenda = screen.getByRole('navigation', { name: 'Agenda' })
+    const chips = agenda.querySelectorAll('button').length
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Add an agenda header' })
+    )
+    const box = screen.getByRole('textbox', { name: 'New agenda header' })
+    expect(box).toHaveFocus()
+    fireEvent.change(box, { target: { value: 'Any other business' } })
+    fireEvent.submit(box)
+
+    const added = headersOf(store.getState()).find(
+      header => header.title === 'Any other business'
+    )
+    expect(added).toMatchObject({ off_agenda: false })
+    expect(focused).toEqual([added?.id])
+    expect(agenda).toHaveTextContent('Any other business')
+    // The box is gone, the "+" is back, and there is one more chip.
+    expect(
+      screen.queryByRole('textbox', { name: 'New agenda header' })
+    ).toBeNull()
+    expect(agenda.querySelectorAll('button')).toHaveLength(chips + 1)
+    // It is the host's doing: undo takes it back.
+    act(() => void store.undo())
+    expect(agenda).not.toHaveTextContent('Any other business')
+  })
+
+  it('adds no header on Escape, or from an empty box', () => {
+    const { store, focused } = show()
+    const count = headersOf(store.getState()).length
+    const open = () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Add an agenda header' })
+      )
+      return screen.getByRole('textbox', { name: 'New agenda header' })
+    }
+    let box = open()
+    fireEvent.change(box, { target: { value: 'Not this' } })
+    fireEvent.keyDown(box, { key: 'Escape' })
+    expect(
+      screen.queryByRole('textbox', { name: 'New agenda header' })
+    ).toBeNull()
+
+    box = open()
+    fireEvent.blur(box)
+    expect(
+      screen.queryByRole('textbox', { name: 'New agenda header' })
+    ).toBeNull()
+
+    expect(headersOf(store.getState())).toHaveLength(count)
+    expect(focused).toEqual([])
+  })
 
   it('shows REC and the meeting clock while recording', () => {
     show()

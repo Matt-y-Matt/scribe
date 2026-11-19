@@ -99,6 +99,11 @@ export const SettingsAudio = fixtureHome(
   { name: 'settings', tab: 'audio' }
 )
 
+export const SettingsAppearance = fixtureHome(
+  { meetings: FIXTURE_MEETINGS.slice(1) },
+  { name: 'settings', tab: 'appearance' }
+)
+
 /** Parakeet installed, Whisper a third of the way down. */
 export const SettingsSpeech = fixtureHome(
   {

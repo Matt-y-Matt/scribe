@@ -144,6 +144,14 @@ Matt asked to keep building before his real 60-minute meeting (planned for 2026-
 - **Checked in the real app:** on this PC's own data, the one-click test meeting was renamed in place, and the newest test meeting (six minutes, 10 open actions) was deleted after its confirmation: it left the list, Open actions went from 13 to 3, and its folder was gone from `%LOCALAPPDATA%\co.custore.scribe\meetings` while the other five folders and the `models` folder were untouched. Refusing a meeting that is being recorded is in the core and was not exercised: Home cannot be reached while one runs.
 - **Limits:** deleting is for good; there is no bin. A renamed meeting no longer matches the earlier meetings of its old title, so "From last time" follows the new name. The speech models and the other meetings are never touched: the core checks that the id is a plain id before it is made into a path.
 
+### The four small leftovers, built the same day at Matt's word ("Build leftovers")
+- **Save the summary as a file.** **Save as…** beside Copy on the end screen opens Windows' own Save dialog, offering `<title>, <date>.md`, and writes what is on screen there. The screen then says where the file went. Closing the dialog changes nothing; a folder that cannot be written says so. The dialog is opened by the core (`save_text_as`), so the page is still granted neither the dialog nor the disk; the file name is cleaned of anything that could name a folder before it is offered.
+- **"+" after the agenda chips.** It becomes a box; Enter or clicking away adds a header at the end of the agenda, before Unplanned, and the map goes to the new column. Escape or an empty box adds nothing. A title the agenda already has shows that column instead of making a second one. It is one undoable step (Ctrl+Z).
+- **Remove a highlight.** A click on a highlight still plays it, and now also puts it "in hand": the line above the wave shows its times, its name and **Remove highlight**. Without a mouse, the highlight the playhead stands in (`[` and `]` move it) is the one in hand. After removing, the line offers **Put it back** for five seconds. The quote card the highlight made stays on the map; it is deleted like any card.
+- **Theme.** Settings has a third tab, **Appearance**: Same as Windows, Light, Dark. It changes at once and is remembered.
+- **Not checked in the real app when this was committed.** The four were seen in Chromium against the fixtures (screenshots and Playwright). The Save dialog is Windows' own and has been compiled, not opened; that is the one to try first.
+- **Tests**: 334 TypeScript, 71 Rust, 40 Playwright, all passing locally. `pnpm screenshot` covers 19 states (`settings-appearance` is new).
+
 ### Not verified
 - **The model-written layout, beyond one try.** Asked for "one short paragraph in plain words, then the actions as a table" on a cut of the fixture's notes, the local model answered in 42 s with a correct table and a paragraph that got a condition wrong (it wrote that the quote is 42 *if* a Q2 batch is signed; the notes say 42, or 40 if it is signed) and added dollar signs. The screen says a model wrote the text and to read it against the lists. The three built-in layouts use no model and cannot do this.
 - **Copy** in the installed app. `navigator.clipboard` was not exercised in the real window.
@@ -158,11 +166,12 @@ Matt asked to keep building before his real 60-minute meeting (planned for 2026-
 - **Drafts are copied, not sent**, and edits to a draft are kept only while the screen is open. Sending is M5.
 
 ### Left unfinished here
-- No export to a file (Markdown, txt, srt, JSON): the summary can be copied.
+- The summary can be saved as a Markdown file; the other exports of PRD F10.5 (transcript as txt/srt, the map as JSON) are not built.
 - A card added on the map after the first wrap-up starts ticked only if it was added by hand in review; anything else added later starts unticked.
 - Pinned topics have **Schedule** on the end screen, which marks them; the `.ics` file is M5.
 - Home's preview does not show the written summary, only the lists it was made from.
-- Still missing from the M2 list: the level test in Settings, `+` to add an agenda header mid-meeting, removing a highlight, changing microphone mid-meeting.
+- Still missing from the M2 list: the level test in Settings, changing microphone mid-meeting.
+- A header added with "+" cannot be renamed, reordered or removed except by Ctrl+Z; an empty one stays as an empty column.
 - `scripts/shot.ts` is a helper for one screenshot of a screen state after a few clicks; it needs `vite` on port 4173.
 
 ## M2 — Live capture and transcript (2026-11-19)

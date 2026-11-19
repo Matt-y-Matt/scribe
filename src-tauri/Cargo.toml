@@ -24,6 +24,8 @@ tauri-plugin-log = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-store = "2"
+# The Save dialog, opened from the core only: the webview is not granted it.
+tauri-plugin-dialog = "2"
 # Added in M0 per docs/BUILD_PLAN.md; registered in M3 (hold-to-talk).
 tauri-plugin-global-shortcut = "2"
 

@@ -5,15 +5,29 @@ import { Button } from '@/components/ui/button'
 import type { ModelDownload, ModelInfo } from '@/ipc'
 import type { SettingsTab } from '@/lib/app-state'
 import { useBackend } from '@/lib/backend'
+import { logger } from '@/lib/logger'
 import { usePrefs } from '@/lib/prefs'
+import { setThemePreference, useTheme, type ThemePreference } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 
-// Settings, UI_SPEC §3.5, with the two tabs M2 needs: Audio and Speech. The
-// other tabs (AI, Scribe, Sending, Privacy, About) arrive with what they set.
+// Settings, UI_SPEC §3.5, with the two tabs M2 needs, Audio and Speech, and
+// Appearance for the light/dark switch of §1. The other tabs (AI, Scribe,
+// Sending, Privacy, About) arrive with what they set.
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: 'audio', label: 'Audio' },
   { id: 'speech', label: 'Speech' },
+  { id: 'appearance', label: 'Appearance' },
+]
+
+const THEMES: { id: ThemePreference; label: string; note: string }[] = [
+  {
+    id: 'system',
+    label: 'Same as Windows',
+    note: 'Follows the light or dark mode Windows is in.',
+  },
+  { id: 'light', label: 'Light', note: 'Always light.' },
+  { id: 'dark', label: 'Dark', note: 'Always dark.' },
 ]
 
 const megabytes = (bytes: number) => `${Math.round(bytes / 1_000_000)} MB`
@@ -243,6 +257,38 @@ function Speech() {
   )
 }
 
+function Appearance() {
+  const preference = useTheme(theme => theme.preference)
+  const choose = (next: ThemePreference) => {
+    setThemePreference(next).catch((error: unknown) =>
+      logger.warn('The theme was changed but could not be saved', {
+        error: String(error),
+      })
+    )
+  }
+
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="mb-2 text-secondary font-semibold">Theme</legend>
+      {THEMES.map(({ id, label, note }) => (
+        <label key={id} className="flex items-start gap-2">
+          <input
+            type="radio"
+            name="theme"
+            checked={preference === id}
+            onChange={() => choose(id)}
+            className="mt-0.5 size-3.5 accent-accent"
+          />
+          <span>
+            <span className="block text-body">{label}</span>
+            <span className="block text-meta text-text-muted">{note}</span>
+          </span>
+        </label>
+      ))}
+    </fieldset>
+  )
+}
+
 export function Settings({
   tab,
   onTab,
@@ -278,7 +324,13 @@ export function Settings({
         ))}
       </div>
       <div role="tabpanel" className="p-4">
-        {tab === 'audio' ? <Audio /> : <Speech />}
+        {tab === 'audio' ? (
+          <Audio />
+        ) : tab === 'speech' ? (
+          <Speech />
+        ) : (
+          <Appearance />
+        )}
       </div>
     </Sheet>
   )

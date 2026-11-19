@@ -21,6 +21,7 @@ export const SCREEN_IDS = [
   'end',
   'settings-audio',
   'settings-speech',
+  'settings-appearance',
 ] as const
 
 export type ScreenId = (typeof SCREEN_IDS)[number]

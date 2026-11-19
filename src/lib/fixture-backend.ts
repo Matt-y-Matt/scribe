@@ -126,6 +126,8 @@ export function fixtureBackend(overrides: Partial<FixtureData> = {}): Backend {
         Reflect.deleteProperty(kept, meetingId)
       }
     },
+    // No disk under the fixtures: say where it would have gone.
+    saveTextAs: async fileName => `C:\\Users\\you\\Documents\\${fileName}`,
     unfinishedMeetings: async () =>
       data.meetings.filter(
         row => row.started_at_ms !== null && row.ended_at_ms === null

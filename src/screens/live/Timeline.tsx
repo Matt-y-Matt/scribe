@@ -6,7 +6,7 @@ import { useStore } from 'zustand'
 import { Button } from '@/components/ui/button'
 import { addCard, addTopic } from '@/engine/actions'
 import { headersOf } from '@/engine/model'
-import type { SegmentFinal } from '@/ipc'
+import type { Highlight, SegmentFinal } from '@/ipc'
 import { clock } from './format'
 import { useLive } from './live-context'
 
@@ -27,7 +27,7 @@ const MIN_HIGHLIGHT_MS = 300
 const KEEP_MS = 20_000
 /** The most of what was said that a quote card carries. */
 const QUOTE_CHARS = 240
-/** How long the timeline says what M kept. */
+/** How long the timeline says what M kept, or what was removed. */
 const KEPT_NOTE_MS = 5_000
 
 const isTyping = (target: EventTarget | null) =>
@@ -85,7 +85,7 @@ function Wave({
   pending: Span | null
   onSeek: (tMs: number) => void
   onMark: (span: Span) => void
-  onRegion: (span: Span) => void
+  onRegion: (id: string, span: Span) => void
 }) {
   const box = useRef<HTMLDivElement>(null)
   const surfer = useRef<WaveSurfer>(null)
@@ -139,7 +139,7 @@ function Wave({
     })
     const offRegion = regionsPlugin.on('region-clicked', (region, event) => {
       event.stopPropagation()
-      latest.current.onRegion({
+      latest.current.onRegion(region.id, {
         t0: Math.round(region.start * 1000),
         t1: Math.round(region.end * 1000),
       })
@@ -302,6 +302,10 @@ export function Timeline() {
   const [name, setName] = useState('')
   /** The span just kept with M, said back for a few seconds. */
   const [kept, setKept] = useState<Span | null>(null)
+  /** The highlight that was clicked: the one Remove would take. */
+  const [pickedId, setPickedId] = useState<string | null>(null)
+  /** The highlight just removed, kept for a few seconds so it can come back. */
+  const [removed, setRemoved] = useState<Highlight | null>(null)
 
   const live = !review && (rec === 'recording' || rec === 'paused')
   const recordedMs = Math.max(
@@ -312,6 +316,15 @@ export function Timeline() {
   // While a meeting is live and nothing plays, "now" is the live edge.
   const cursorMs = playback.playing || !live ? playback.tMs : recordedMs
   const hasAudio = recordedMs > 0
+  // The highlight in hand: the one that was clicked, else the one the
+  // playhead stands in (so [ and ] reach it without a mouse).
+  const picked =
+    highlights.find(highlight => highlight.id === pickedId) ??
+    ((playback.playing || !live) && hasAudio
+      ? highlights.find(
+          highlight => highlight.t0_ms <= cursorMs && cursorMs < highlight.t1_ms
+        )
+      : undefined)
 
   const seek = (tMs: number) => {
     const target = Math.min(Math.max(0, tMs), recordedMs)
@@ -390,6 +403,23 @@ export function Timeline() {
     const timer = setTimeout(() => setKept(null), KEPT_NOTE_MS)
     return () => clearTimeout(timer)
   }, [kept])
+
+  const remove = (highlight: Highlight) => {
+    actions.removeHighlight(highlight.id)
+    setPickedId(null)
+    setKept(null)
+    setRemoved(highlight)
+  }
+  const putBack = () => {
+    if (!removed) return
+    actions.addHighlight(removed.t0_ms, removed.t1_ms, removed.label)
+    setRemoved(null)
+  }
+  useEffect(() => {
+    if (!removed) return
+    const timer = setTimeout(() => setRemoved(null), KEPT_NOTE_MS)
+    return () => clearTimeout(timer)
+  }, [removed])
 
   const keys = useRef({ toggle, seek, mark, keepLast, cursorMs })
   useEffect(() => {
@@ -498,6 +528,38 @@ export function Timeline() {
               Save
             </Button>
           </form>
+        ) : picked ? (
+          <p
+            role="status"
+            className="ml-2 flex min-w-0 flex-1 items-center gap-2 text-secondary"
+          >
+            <span className="shrink-0 font-mono text-meta text-text-muted">
+              {clock(picked.t0_ms)}–{clock(picked.t1_ms)}
+            </span>
+            <span className="min-w-0 truncate">
+              {picked.label || 'Highlight'}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              title="Take this highlight off the timeline"
+              onClick={() => remove(picked)}
+            >
+              Remove highlight
+            </Button>
+          </p>
+        ) : removed ? (
+          <p
+            role="status"
+            className="ml-2 flex min-w-0 flex-1 items-center gap-2 text-secondary text-text-muted"
+          >
+            <span className="min-w-0 truncate">
+              Highlight removed. Its quote card stays on the map.
+            </span>
+            <Button variant="outline" size="sm" onClick={putBack}>
+              Put it back
+            </Button>
+          </p>
         ) : (
           <p className="ml-2 min-w-0 flex-1 truncate text-secondary text-text-muted">
             {kept
@@ -533,9 +595,15 @@ export function Timeline() {
           label: highlight.label,
         }))}
         pending={pending}
-        onSeek={tMs => actions.seekPlay(Math.min(tMs, recordedMs))}
+        onSeek={tMs => {
+          setPickedId(null)
+          actions.seekPlay(Math.min(tMs, recordedMs))
+        }}
         onMark={setPending}
-        onRegion={span => actions.playSpan(span.t0, span.t1)}
+        onRegion={(id, span) => {
+          setPickedId(id)
+          actions.playSpan(span.t0, span.t1)
+        }}
       />
       <Bands segments={segments} durationMs={durationMs} loopback={loopback} />
     </section>

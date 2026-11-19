@@ -12,6 +12,7 @@ import {
 import type { Summary } from '@/ipc'
 import { cn } from '@/lib/utils'
 import { CopyButton } from './CopyButton'
+import { SaveButton } from './SaveButton'
 
 // The summary, UI_SPEC §3.3. The three presets are written from the ticked
 // rows the moment they change, with no model. Typing a layout of one's own
@@ -20,6 +21,10 @@ import { CopyButton } from './CopyButton'
 // saved.
 
 const SAVE_AFTER_MS = 500
+
+/** "Custore weekly, 19 Nov 2026.md": what the Save dialog offers. */
+const fileNameOf = (meta: SummaryMeta) =>
+  `${[meta.title, meta.date].filter(Boolean).join(', ')}.md`
 
 const isPreset = (value: string | null): value is SummaryPreset =>
   SUMMARY_PRESETS.includes(value as SummaryPreset)
@@ -30,6 +35,7 @@ export function SummaryPanel({
   initial,
   onSave,
   ask,
+  saveAs,
 }: {
   state: MapState
   meta: SummaryMeta
@@ -38,6 +44,8 @@ export function SummaryPanel({
   onSave: (summary: Summary) => void
   /** One request to the model on this PC (the core's relay to Ollama). */
   ask: (body: string) => Promise<string>
+  /** Writes a file where the person says; null when they close the dialog. */
+  saveAs: (fileName: string, text: string) => Promise<string | null>
 }) {
   const [preset, setPreset] = useState<SummaryPreset>(
     isPreset(initial.layout) ? initial.layout : 'decisions-actions'
@@ -58,6 +66,10 @@ export function SummaryPanel({
   const [byModel, setByModel] = useState(false)
   const [writing, setWriting] = useState(false)
   const [failed, setFailed] = useState(false)
+  /** Where the file went, or that it could not be written. */
+  const [file, setFile] = useState<{ path: string } | { failed: true } | null>(
+    null
+  )
 
   const shown = own?.text ?? preview
   const stale = own !== null && own.from !== preview
@@ -118,6 +130,10 @@ export function SummaryPanel({
           SUMMARY
         </h2>
         <CopyButton text={shown} />
+        <SaveButton
+          save={() => saveAs(fileNameOf(meta), shown)}
+          onSaved={setFile}
+        />
       </div>
 
       <div role="radiogroup" aria-label="Layout" className="flex gap-1">
@@ -214,6 +230,16 @@ export function SummaryPanel({
         }
         className="min-h-40 flex-1 resize-none rounded-md border bg-surface p-3 font-mono text-secondary outline-none focus:border-accent"
       />
+      {file && 'path' in file && (
+        <p role="status" className="text-secondary break-words">
+          Saved to {file.path}
+        </p>
+      )}
+      {file && 'failed' in file && (
+        <p role="alert" className="text-secondary">
+          The file could not be written there. Try another folder.
+        </p>
+      )}
       <p className="text-meta text-text-muted">
         Markdown. Edit it freely; it is saved on this PC as you type.
       </p>

@@ -1,3 +1,4 @@
+import { create } from 'zustand'
 import { getSetting, setSetting } from './settings'
 import { logger } from './logger'
 
@@ -11,6 +12,11 @@ const PREFERENCES: readonly ThemePreference[] = ['system', 'light', 'dark']
 export function isThemePreference(value: unknown): value is ThemePreference {
   return PREFERENCES.includes(value as ThemePreference)
 }
+
+/** The saved choice, for the switch in Settings to show. */
+export const useTheme = create<{ preference: ThemePreference }>(() => ({
+  preference: 'system',
+}))
 
 export function applyTheme(
   preference: ThemePreference,
@@ -39,7 +45,9 @@ export async function initTheme(
   }
   try {
     const saved = await getSetting<unknown>(THEME_KEY)
-    applyTheme(isThemePreference(saved) ? saved : 'system')
+    const preference = isThemePreference(saved) ? saved : 'system'
+    useTheme.setState({ preference })
+    applyTheme(preference)
   } catch (error) {
     logger.warn('Could not read the saved theme; following the system', {
       error: String(error),
@@ -51,5 +59,6 @@ export async function setThemePreference(
   preference: ThemePreference
 ): Promise<void> {
   applyTheme(preference)
+  useTheme.setState({ preference })
   await setSetting(THEME_KEY, preference)
 }

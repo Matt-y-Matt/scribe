@@ -1,7 +1,8 @@
-import { Search, Settings } from 'lucide-react'
+import { Plus, Search, Settings } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import { Button } from '@/components/ui/button'
+import { addHeader } from '@/engine/actions'
 import { headersOf } from '@/engine/model'
 import { cn } from '@/lib/utils'
 import { clock } from './format'
@@ -154,6 +155,71 @@ function Levels() {
   )
 }
 
+/** "+" after the agenda: a header added while the meeting runs (§2.1). */
+function AddHeader() {
+  const { store, focusHeader } = useLive()
+  const [adding, setAdding] = useState(false)
+  const [title, setTitle] = useState('')
+
+  // The box leaves once: Enter, Escape, or the blur that follows either.
+  const settled = useRef(false)
+
+  const close = () => {
+    settled.current = true
+    setAdding(false)
+    setTitle('')
+  }
+  // Enter or clicking away adds it; an empty box adds nothing.
+  const add = () => {
+    if (settled.current) return
+    const header = addHeader(store, title)
+    if (header) focusHeader(header.id)
+    close()
+  }
+
+  if (!adding) {
+    return (
+      <button
+        type="button"
+        aria-label="Add an agenda header"
+        title="Add an agenda header"
+        className="flex size-6 shrink-0 items-center justify-center rounded-md border text-text-muted transition-opacity duration-150 ease-out hover:bg-surface-2"
+        onClick={() => {
+          settled.current = false
+          setAdding(true)
+        }}
+      >
+        <Plus size={12} aria-hidden />
+      </button>
+    )
+  }
+  return (
+    <form
+      className="shrink-0"
+      onSubmit={event => {
+        event.preventDefault()
+        add()
+      }}
+    >
+      <input
+        autoFocus
+        aria-label="New agenda header"
+        placeholder="New header"
+        value={title}
+        onChange={event => setTitle(event.target.value)}
+        onBlur={add}
+        onKeyDown={event => {
+          if (event.key === 'Escape') {
+            event.stopPropagation()
+            close()
+          }
+        }}
+        className="h-6 w-44 rounded-md border border-accent bg-surface px-2 text-secondary outline-none placeholder:text-text-muted"
+      />
+    </form>
+  )
+}
+
 export function StatusStrip() {
   const { session, actions, state, focusHeader, openPalette } = useLive()
   const rec = useStore(session, store => store.rec)
@@ -185,23 +251,27 @@ export function StatusStrip() {
 
       <nav
         aria-label="Agenda"
-        className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden border-l pl-3"
+        className="flex min-w-0 flex-1 items-center gap-1 border-l pl-3"
       >
-        {agenda.length === 0 ? (
-          <span className="text-secondary text-text-muted">No agenda</span>
-        ) : (
-          agenda.map(header => (
-            <button
-              key={header.id}
-              type="button"
-              title={`Show ${header.title} on the map`}
-              className="h-6 max-w-48 shrink-0 truncate rounded-md border px-2 text-secondary transition-opacity duration-150 ease-out hover:bg-surface-2"
-              onClick={() => focusHeader(header.id)}
-            >
-              {header.title}
-            </button>
-          ))
-        )}
+        {/* The chips may run out of room; the "+" after them never does. */}
+        <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+          {agenda.length === 0 ? (
+            <span className="text-secondary text-text-muted">No agenda</span>
+          ) : (
+            agenda.map(header => (
+              <button
+                key={header.id}
+                type="button"
+                title={`Show ${header.title} on the map`}
+                className="h-6 max-w-48 shrink-0 truncate rounded-md border px-2 text-secondary transition-opacity duration-150 ease-out hover:bg-surface-2"
+                onClick={() => focusHeader(header.id)}
+              >
+                {header.title}
+              </button>
+            ))
+          )}
+        </div>
+        <AddHeader />
       </nav>
 
       {!review && <Levels />}

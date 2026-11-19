@@ -9,12 +9,13 @@ import {
   type FixtureData,
 } from '@/lib/fixture-backend'
 import { DEFAULT_PREFS, usePrefs } from '@/lib/prefs'
+import { useTheme } from '@/lib/theme'
 import { Settings } from './Settings'
 
 afterEach(() => usePrefs.setState(DEFAULT_PREFS))
 
 function show(
-  tab: 'audio' | 'speech',
+  tab: 'audio' | 'speech' | 'appearance',
   data: Partial<FixtureData> = {},
   patch: Partial<Backend> = {}
 ) {
@@ -67,6 +68,34 @@ describe('Settings, Audio', () => {
     await screen.findByRole('combobox')
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('Settings, Appearance', () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-theme')
+    useTheme.setState({ preference: 'system' })
+  })
+
+  it('follows Windows until told otherwise, and changes at once', () => {
+    show('appearance')
+    expect(screen.getByRole('radio', { name: /Same as Windows/ })).toBeChecked()
+
+    fireEvent.click(screen.getByRole('radio', { name: /^Dark/ }))
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
+    expect(screen.getByRole('radio', { name: /^Dark/ })).toBeChecked()
+
+    fireEvent.click(screen.getByRole('radio', { name: /^Light/ }))
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
+
+    fireEvent.click(screen.getByRole('radio', { name: /Same as Windows/ }))
+    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+  })
+
+  it('shows the choice that was saved', () => {
+    useTheme.setState({ preference: 'light' })
+    show('appearance')
+    expect(screen.getByRole('radio', { name: /^Light/ })).toBeChecked()
   })
 })
 

@@ -218,6 +218,53 @@ test.describe('timeline', () => {
     expect((await session(page)).highlights).toHaveLength(before + 2)
   })
 
+  test('a highlight is removed from the timeline, and can be put back', async ({
+    page,
+  }) => {
+    const errors = await open(page, 'review')
+    await expect(waveform(page).locator('canvas').first()).toBeVisible()
+    const timeline = page.getByRole('region', { name: 'Timeline' })
+    const before = (await session(page)).highlights ?? []
+    expect(before.map(row => row[2])).toContain('The price')
+    const quotes = await page.locator('[data-kind=quote]').count()
+
+    // A click on the highlight plays it and puts it in hand.
+    await waveform(page).getByText('The price').click()
+    await expect(timeline).toContainText('00:01:12–00:01:19')
+    await timeline.getByRole('button', { name: 'Remove highlight' }).click()
+
+    await expect(timeline).toContainText('Highlight removed.')
+    await expect(waveform(page)).not.toContainText('The price')
+    expect((await session(page)).highlights).toHaveLength(before.length - 1)
+    // The quote card is the map's, and stays.
+    await expect(page.locator('[data-kind=quote]')).toHaveCount(quotes)
+
+    await timeline.getByRole('button', { name: 'Put it back' }).click()
+    await expect(waveform(page)).toContainText('The price')
+    expect((await session(page)).highlights).toHaveLength(before.length)
+    expect(errors).toEqual([])
+  })
+
+  test('the "+" after the agenda adds a header column to the map', async ({
+    page,
+  }) => {
+    const errors = await open(page, 'live')
+    const agenda = page.getByRole('navigation', { name: 'Agenda' })
+    await agenda.getByRole('button', { name: 'Add an agenda header' }).click()
+    const box = agenda.getByRole('textbox', { name: 'New agenda header' })
+    await expect(box).toBeFocused()
+    await box.fill('Any other business')
+    await box.press('Enter')
+
+    await expect(
+      agenda.getByRole('button', { name: 'Any other business' })
+    ).toBeVisible()
+    await expect(page.getByRole('region', { name: 'Map' })).toContainText(
+      'Any other business'
+    )
+    expect(errors).toEqual([])
+  })
+
   test('Escape drops a highlight that was not named', async ({ page }) => {
     await open(page, 'live')
     await expect(waveform(page).locator('canvas').first()).toBeVisible()

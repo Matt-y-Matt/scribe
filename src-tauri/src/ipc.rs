@@ -224,6 +224,77 @@ pub async fn save_summary(
     Ok(state.store.save_summary(&meeting_id, &summary).await?)
 }
 
+/// A name Windows accepts for a file, from a title a person typed: the
+/// characters a path may not hold become spaces, and an empty result becomes
+/// "Summary". Nothing here can name a folder.
+pub(crate) fn safe_file_name(wanted: &str) -> String {
+    let cleaned: String = wanted
+        .chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => ' ',
+            c if c.is_control() => ' ',
+            c => c,
+        })
+        .collect();
+    // A word of dots alone is a way up a folder; it is dropped.
+    let words: Vec<&str> = cleaned
+        .split_whitespace()
+        .filter(|word| !word.chars().all(|c| c == '.'))
+        .collect();
+    let name = words.join(" ");
+    // Windows drops a trailing dot or space, so they are not offered.
+    let name = name.trim_end_matches(['.', ' ']);
+    let (stem, extension) = match name.rfind('.') {
+        Some(at) if name.len() - at <= 10 => name.split_at(at),
+        _ => (name, ""),
+    };
+    let stem: String = stem.chars().take(120).collect();
+    let stem = stem.trim_end();
+    if stem.is_empty() {
+        return format!("Summary{extension}");
+    }
+    format!("{stem}{extension}")
+}
+
+/// Asks where to save a text file and writes it there. The place is chosen
+/// by the person in Windows' own Save dialog, never by the page. Returns the
+/// path written, or nothing when the dialog was closed.
+#[tauri::command]
+#[specta::specta]
+pub async fn save_text_as(
+    app: tauri::AppHandle,
+    file_name: String,
+    text: String,
+) -> CommandResult<Option<String>> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let name = safe_file_name(&file_name);
+    let mut dialog = app.dialog().file().set_file_name(&name);
+    if let Some(extension) = std::path::Path::new(&name)
+        .extension()
+        .and_then(|extension| extension.to_str())
+    {
+        let kind = if extension.eq_ignore_ascii_case("md") {
+            "Markdown"
+        } else {
+            "Text"
+        };
+        dialog = dialog.add_filter(kind, &[extension]);
+    }
+    // Blocking is right here: a command runs off the main thread, and the
+    // dialog is the only thing the person can do until it closes.
+    let Some(picked) = dialog.blocking_save_file() else {
+        return Ok(None);
+    };
+    let path = picked
+        .into_path()
+        .map_err(|error| AppError::Storage(error.to_string()))?;
+    tokio::fs::write(&path, text)
+        .await
+        .map_err(|error| AppError::Storage(error.to_string()))?;
+    Ok(Some(path.display().to_string()))
+}
+
 /// Every action not yet marked done, across meetings, oldest first.
 #[tauri::command]
 #[specta::specta]
@@ -602,6 +673,7 @@ pub fn builder() -> Builder<tauri::Wry> {
             delete_meeting,
             get_summary,
             save_summary,
+            save_text_as,
             open_actions,
             set_card_done,
             start,
@@ -661,6 +733,27 @@ mod tests {
     #[ignore]
     fn export_ipc() {
         std::fs::write(IPC_TS, ipc_ts()).expect("src/ipc.ts must be writable");
+    }
+
+    #[test]
+    fn a_title_becomes_a_file_name_windows_accepts() {
+        assert_eq!(
+            safe_file_name("Custore weekly 2026-11-19.md"),
+            "Custore weekly 2026-11-19.md"
+        );
+        assert_eq!(
+            safe_file_name("Q4: prices / stock? \"final\".md"),
+            "Q4 prices stock final.md"
+        );
+        // No folder can be named, here or above.
+        assert_eq!(safe_file_name("..\\..\\Windows\\x.md"), "Windows x.md");
+        assert_eq!(safe_file_name("   "), "Summary");
+        assert_eq!(safe_file_name(".md"), "Summary.md");
+        assert_eq!(safe_file_name(&"a".repeat(300)).chars().count(), 120);
+        // A long title keeps its extension.
+        let long = safe_file_name(&format!("{}.md", "a".repeat(300)));
+        assert_eq!(long.chars().count(), 123);
+        assert!(long.ends_with(".md"));
     }
 
     #[test]

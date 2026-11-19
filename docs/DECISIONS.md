@@ -2,6 +2,11 @@
 
 One line per decision, newest first. Format: `YYYY-MM-DD — decision — why — who`.
 
+- 2026-11-19 — The four small leftovers of docs/PROPOSALS.md §3 built: save the summary as a file, "+" for an agenda header, remove a highlight, theme switch — Matt: "Build leftovers" — Matt
+- 2026-11-19 — The Save dialog is `tauri-plugin-dialog`, called from the core in one command (`save_text_as`); the webview's capabilities are unchanged — the page should not be able to open dialogs or write files on its own (CLAUDE.md: grant only what the webview uses); the person picks the place in Windows' dialog and the core writes there — Claude
+- 2026-11-19 — The theme switch is a new Settings tab, Appearance, which UI_SPEC §3.5 does not list — §1 asks for a light/dark switch and none of the listed tabs is about looks; it can move into About when that tab exists — Claude, for Matt to confirm
+- 2026-11-19 — Removing a highlight leaves the quote card it made on the map, and is undone with a "Put it back" button for five seconds, not Ctrl+Z — the card may have been reworded or moved since, and deleting it is one click on the card; highlights are not part of the map's undo history — Claude, for Matt to confirm
+- 2026-11-19 — A header added mid-meeting goes to the end of the agenda, and a title that is already a header shows that one — the model places topics by header title, so two headers of one name would leave it guessing — Claude
 - 2026-11-19 — Proposal G built: rename and delete a meeting from Home — Matt: "Yes, build G" — Matt
 - 2026-11-19 — Deleting a meeting is permanent and asks first, naming what goes; there is no bin and no undo. The recording's folder is removed before the database rows, and a meeting being recorded is refused — a person may ask for a recording to be gone, and "gone" should mean it (PRD F11); if a failure leaves anything behind it should be a listed meeting with no sound, never sound with no listing; both buttons of the confirmation are plain outline buttons with the focus on Keep it, because UI_SPEC §5 allows no red except the recording indicator — Claude, for Matt to confirm
 - 2026-11-19 — Proposals C, D, E and F (docs/PROPOSALS.md) built: read-back, `M` to keep the last 20 seconds, `N`/`A`/`D` to write a card, the owner chip as a control — Matt: "Yes, build them" — Matt
@@ -122,6 +127,7 @@ Licence as declared in the npm or crates.io registry on the day the dependency w
 | Dependencies of the vendored crates: wasapi, rubato, realfft, ebur128, audioadapter-buffers, tokio-stream, tracing | MIT | M2 |
 | Dependency of the vendored crates: cpal | Apache-2.0 | M2 |
 | hound | Apache-2.0 | M2 |
+| tauri-plugin-dialog (the Save dialog; brings rfd, MIT, and tauri-plugin-fs, which is not registered) | Apache-2.0 OR MIT | after M2 |
 | tokio, tokio-util | MIT | M2 |
 | futures-util, thiserror, reqwest, sha2, sqlx (replaces tauri-plugin-sql), ulid (Rust), ndarray | MIT OR Apache-2.0 | M2 |
 | livekit (Rust SDK), livekit-client (JS) | Apache-2.0 | M4 |

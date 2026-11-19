@@ -54,10 +54,10 @@ The test for every item: does it get an action out of the room with an owner and
 - **Cost.** One session. PRD F12.1 asks for it anyway.
 
 ## 3. Smaller things, cheap, worth doing with the above
-- **Save the summary as a file** (`.md`), next to Copy. Needs the save dialog; an hour.
-- **"+" on the agenda chips** to add a header mid-meeting (in UI_SPEC §2.1, not built).
-- **Remove a highlight** from the timeline (the code path exists, there is no control).
-- **Theme switch in Settings** (light, dark, as Windows). Both themes are complete; only the OS setting chooses today.
+- **Save the summary as a file** (`.md`), next to Copy. Built 2026-11-19, see NOTES.
+- **"+" on the agenda chips** to add a header mid-meeting (UI_SPEC §2.1). Built 2026-11-19.
+- **Remove a highlight** from the timeline. Built 2026-11-19.
+- **Theme switch in Settings** (light, dark, as Windows). Built 2026-11-19.
 - **A due date that is a date.** "Friday" is kept as text. Showing "Fri 21 Nov" next to it, worked out from the meeting's day, would let Open actions sort by date and show what is late. Text stays the truth; the date is a reading of it.
 - **Speaker name on a transcript line**: click `Room` on a line to say who it was; later lines stay `Room`. Useful only until phones do it properly (M4), so low.
 

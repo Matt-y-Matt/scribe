@@ -12,7 +12,7 @@ export type Route =
    */
   | { name: 'meeting'; meetingId: string; start?: boolean; atMs?: number }
 
-export type SettingsTab = 'audio' | 'speech'
+export type SettingsTab = 'audio' | 'speech' | 'appearance'
 
 /** A past meeting to start the next one from. */
 export interface MeetingLike {

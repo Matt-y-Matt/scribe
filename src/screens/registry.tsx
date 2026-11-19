@@ -5,6 +5,7 @@ import {
   HomeList,
   HomeSearch,
   PreMeetingSheet,
+  SettingsAppearance,
   SettingsAudio,
   SettingsSpeech,
 } from './home/HomeFixtures'
@@ -42,4 +43,5 @@ export const SCREENS: Record<ScreenId, ComponentType> = {
   end: End,
   'settings-audio': SettingsAudio,
   'settings-speech': SettingsSpeech,
+  'settings-appearance': SettingsAppearance,
 }

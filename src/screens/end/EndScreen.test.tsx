@@ -284,6 +284,46 @@ describe('EndScreen', () => {
     expect(text.value).toBe(before)
   })
 
+  it('saves what is on screen as a file, and says where it went', async () => {
+    const saveTextAs = vi.fn<Backend['saveTextAs']>(
+      async fileName => `D:\\Minutes\\${fileName}`
+    )
+    show({ backend: { saveTextAs } })
+    const text = await summaryText()
+    await waitFor(() => expect(text.value).toContain('## Decisions'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save as…' }))
+    await waitFor(() => expect(saveTextAs).toHaveBeenCalledTimes(1))
+    const [fileName, written] = saveTextAs.mock.calls[0] ?? []
+    expect(fileName).toMatch(/^Custore weekly team meeting.*\.md$/)
+    expect(written).toBe(text.value)
+    expect(
+      await screen.findByText(/^Saved to D:\\Minutes\\Custore/)
+    ).toBeVisible()
+  })
+
+  it('says nothing when the Save dialog is closed, and says so when the file cannot be written', async () => {
+    const saveTextAs = vi
+      .fn<Backend['saveTextAs']>()
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(
+        new BackendError({ kind: 'storage', detail: 'denied' })
+      )
+    show({ backend: { saveTextAs } })
+    await summaryText()
+    const button = screen.getByRole('button', { name: 'Save as…' })
+
+    fireEvent.click(button)
+    await waitFor(() => expect(button).toBeEnabled())
+    expect(screen.queryByText(/^Saved to/)).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    fireEvent.click(button)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The file could not be written there.'
+    )
+  })
+
   it('goes back to the map, and Finish leaves without sending anything', async () => {
     const { session, leave } = show()
     await summaryText()

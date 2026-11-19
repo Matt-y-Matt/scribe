@@ -11,12 +11,14 @@ import {
   initTheme,
   setThemePreference,
   themeFromSearch,
+  useTheme,
 } from './theme'
 
 const root = document.documentElement
 
 beforeEach(() => {
   root.removeAttribute('data-theme')
+  useTheme.setState({ preference: 'system' })
   vi.mocked(getSetting).mockReset()
   vi.mocked(setSetting).mockReset()
 })
@@ -58,6 +60,7 @@ describe('initTheme', () => {
     vi.mocked(getSetting).mockResolvedValue('light')
     await initTheme('')
     expect(root.getAttribute('data-theme')).toBe('light')
+    expect(useTheme.getState().preference).toBe('light')
   })
 
   it('follows the system when nothing valid is saved', async () => {
@@ -78,5 +81,6 @@ describe('setThemePreference', () => {
     await setThemePreference('dark')
     expect(root.getAttribute('data-theme')).toBe('dark')
     expect(setSetting).toHaveBeenCalledWith('theme', 'dark')
+    expect(useTheme.getState().preference).toBe('dark')
   })
 })
