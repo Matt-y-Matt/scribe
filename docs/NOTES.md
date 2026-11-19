@@ -166,6 +166,18 @@ Matt's screenshots of the Edwin call's map: fifteen topics in one long column, e
 ### `qwen3.5:9b` against `qwen3.5:4b`, on the Edwin recording
 
 - Summary: the 9B kept the launch date (5 December), the delivery dates (the 15th to the 21st) and the two decisions right, and named the upload and timeline disagreements as open. It wrote no actions, where the 4B wrote two wrong ones. 476 s for 31 minutes of talk, against about 60 s; Ollama put 5.2 GB of its 6.2 GB on the GPU and the rest on the CPU.
+- Live notes: 778 s for the call's 62 runs, so about 13 s a run, fast enough. But 75 cards against the 4B's 47, still garbled dates ("If done by 28th"), and on the golden fixture paced 5/5 and 14/17 (82%, a pass but under the 4B's 88–94%); at 10× a run timed out and it failed. **The live note-taker stays on the 4B.**
+
+## Handy's speech model against Parakeet (2026-11-20)
+
+Matt asked whether Qwen3-ASR, which Handy uses for his dictation, hears better than Parakeet. `src-tauri/examples/compare_stt.rs` cuts a stretch of a recorded meeting into utterances as a meeting would and transcribes each with both. Model: sherpa-onnx's `sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25` (1.0 GB unpacked, downloaded to `C:\dev\asr-test`, outside the app); the crate already supports it (`OfflineQwen3ASRModelConfig`). Its licence was not checked. Audio: the Edwin call, 19:30 to 25:30, both channels; 82 utterances, 288 s of speech.
+
+- **Full sentences: Qwen3 is clearly better.** "Indo side" where Parakeet wrote "indoor site" (they mean the Indonesian factories), "tech, lah" where Parakeet wrote "Tecla" (the thing holding them back is the tech), "Chinese New Year" for "high cost chin years all", "we pushed back again", "vet the code", "a damn big PDF", "Christmas, they can"; it keeps "lah" and punctuates. Both still wrote "fifty December" once.
+- **Short or unclear clips: Qwen3 is much worse.** On about 20 of the 82, mostly under 2 s, it wrote Chinese ("对呀，对呀", "我给你摸摸") or something unrelated, where Parakeet wrote the right short line ("Yeah.", "You can only make it by January."). The sherpa-onnx config has no language setting to stop that.
+- **Speed: Qwen3 is 3.5 to 4 times slower.** At 4 threads on an idle PC, real-time factor 0.70 (system audio) and 0.98 (microphone) against Parakeet's 0.20 and 0.27. During the call Parakeet itself ran at 0.63 with Ollama busy, so Qwen3 would fall behind live.
+- Handy's case differs: dictation is one person, close to the microphone, in whole sentences, which is where Qwen3 is strong.
+
+Not decided: Matt's call. The way it could fit is Parakeet live and a Qwen3 pass over the recording after Stop, keeping Parakeet's line where Qwen3's is short or not in Latin script, so the notes and summary read the better transcript.
 
 ## After M2 — the screens around a meeting (2026-11-19)
 
