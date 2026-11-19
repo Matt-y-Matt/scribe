@@ -409,6 +409,35 @@ impl Store {
         Ok(meetings)
     }
 
+    /// Gives a meeting a new title. `None` when there is no such meeting.
+    pub async fn rename_meeting(&self, id: &str, title: &str) -> Result<Option<MeetingInfo>> {
+        sqlx::query("UPDATE meetings SET title = ? WHERE id = ?")
+            .bind(title)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        self.meeting(id).await
+    }
+
+    /// Removes a meeting and everything kept about it: people, transcript
+    /// (and its search index), map, highlights, notes, jobs, consent log.
+    /// Its files are the caller's to remove. False when there was none.
+    pub async fn delete_meeting(&self, id: &str) -> Result<bool> {
+        let mut tx = self.pool.begin().await?;
+        // The one table that names a meeting without a foreign key.
+        sqlx::query("DELETE FROM consent_log WHERE meeting_id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        let gone = sqlx::query("DELETE FROM meetings WHERE id = ?")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?
+            .rows_affected();
+        tx.commit().await?;
+        Ok(gone > 0)
+    }
+
     pub async fn mark_started(&self, id: &str, loopback: bool) -> Result<()> {
         sqlx::query(
             "UPDATE meetings SET started_at_ms = COALESCE(started_at_ms, ?), loopback = ? WHERE id = ?",
@@ -809,6 +838,42 @@ mod tests {
             done_at_ms: None,
             order_key: 1.5,
         }
+    }
+
+    #[tokio::test]
+    async fn a_meeting_is_renamed_and_deleted_with_all_that_was_kept_about_it() {
+        let store = Store::in_memory().await.unwrap();
+        for id in ["m_1", "m_2"] {
+            store.create_meeting(id, &new_meeting(id)).await.unwrap();
+            store
+                .insert_segment(&segment(&format!("s_{id}"), id, 0, "the landlord"))
+                .await
+                .unwrap();
+        }
+        store
+            .map_save(&MapPatch {
+                topics: vec![topic("t_1", "Pricing")],
+                cards: vec![card("c_1", "t_1", "Call Ross")],
+                suggestions: vec![],
+                deleted: vec![],
+            })
+            .await
+            .unwrap();
+
+        let renamed = store.rename_meeting("m_1", "Weekly").await.unwrap();
+        assert_eq!(renamed.unwrap().title, "Weekly");
+        assert!(store.rename_meeting("m_9", "x").await.unwrap().is_none());
+
+        assert!(store.delete_meeting("m_1").await.unwrap());
+        assert!(!store.delete_meeting("m_1").await.unwrap(), "already gone");
+        assert!(store.meeting("m_1").await.unwrap().is_none());
+        assert!(store.segments("m_1").await.unwrap().is_empty());
+        assert!(store.map_load("m_1").await.unwrap().cards.is_empty());
+        assert!(store.open_actions().await.unwrap().is_empty());
+        // Its words are out of the search index; the other meeting's are not.
+        let found = store.search_segments(None, "landlord", 10).await.unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].meeting_id, "m_2");
     }
 
     #[tokio::test]

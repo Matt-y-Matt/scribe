@@ -104,6 +104,28 @@ export function fixtureBackend(overrides: Partial<FixtureData> = {}): Backend {
       data.meetings = [row, ...data.meetings]
       return row
     },
+    renameMeeting: async (meetingId, title) => {
+      const renamed = { ...meeting(meetingId), title }
+      data.meetings = data.meetings.map(row =>
+        row.id === meetingId ? renamed : row
+      )
+      return renamed
+    },
+    deleteMeeting: async meetingId => {
+      meeting(meetingId)
+      if (recording.meeting_id === meetingId && recording.state !== 'stopped') {
+        throw new BackendError({ kind: 'busy' })
+      }
+      data.meetings = data.meetings.filter(row => row.id !== meetingId)
+      for (const kept of [
+        data.maps,
+        data.segments,
+        data.highlights,
+        data.summaries,
+      ] as Record<string, unknown>[]) {
+        Reflect.deleteProperty(kept, meetingId)
+      }
+    },
     unfinishedMeetings: async () =>
       data.meetings.filter(
         row => row.started_at_ms !== null && row.ended_at_ms === null

@@ -154,6 +154,27 @@ pub fn meeting_dir(data_dir: &Path, meeting_id: &str) -> PathBuf {
     data_dir.join("meetings").join(meeting_id)
 }
 
+/// Removes a meeting's folder: its recording, its waveform, its numbers.
+/// A meeting that never recorded has no folder, and that is not an error.
+/// The id is checked before it is made into a path, so nothing outside
+/// `meetings` can ever be named.
+pub fn remove_meeting_files(data_dir: &Path, meeting_id: &str) -> std::io::Result<()> {
+    let plain = !meeting_id.is_empty()
+        && meeting_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+    if !plain {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "not a meeting id",
+        ));
+    }
+    match std::fs::remove_dir_all(meeting_dir(data_dir, meeting_id)) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error),
+        _ => Ok(()),
+    }
+}
+
 pub fn audio_dir(data_dir: &Path, meeting_id: &str, source: SourceKind) -> PathBuf {
     meeting_dir(data_dir, meeting_id)
         .join("audio")
@@ -1040,6 +1061,31 @@ pub mod testing {
 mod tests {
     use super::testing::*;
     use super::*;
+
+    #[test]
+    fn removing_a_meetings_files_takes_its_folder_and_nothing_else() {
+        let data_dir = std::env::temp_dir().join(format!("scribe-remove-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&data_dir);
+        for id in ["m_1", "m_2"] {
+            let audio = audio_dir(&data_dir, id, SourceKind::Laptop);
+            std::fs::create_dir_all(&audio).unwrap();
+            std::fs::write(audio.join("000000.wav"), b"RIFF").unwrap();
+        }
+
+        remove_meeting_files(&data_dir, "m_1").unwrap();
+        assert!(!meeting_dir(&data_dir, "m_1").exists());
+        assert!(meeting_dir(&data_dir, "m_2").join("audio").exists());
+        // Never recorded, or already gone: nothing to do, and no error.
+        remove_meeting_files(&data_dir, "m_1").unwrap();
+        remove_meeting_files(&data_dir, "m_never").unwrap();
+
+        // An id that is not an id never reaches the disk.
+        for bad in ["", "..", "../m_2", "m_2/audio", "m_2\\audio", "C:"] {
+            assert!(remove_meeting_files(&data_dir, bad).is_err(), "{bad:?}");
+        }
+        assert!(meeting_dir(&data_dir, "m_2").join("audio").exists());
+        std::fs::remove_dir_all(&data_dir).unwrap();
+    }
     use crate::audio::writer::recorded_samples;
     use crate::audio::SAMPLE_RATE;
 

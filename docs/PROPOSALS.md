@@ -43,7 +43,7 @@ The test for every item: does it get an action out of the room with an owner and
 - **Why.** "Who owes it" is the most common fix, and today it is pencil → field → type → save.
 - **Cost.** Two hours.
 
-### G. Rename and delete a meeting
+### G. Rename and delete a meeting — built 2026-11-19, see NOTES
 - **What.** From Home: rename a meeting; delete one, with its audio, after a confirmation that names what goes.
 - **Why.** Test meetings pile up (there are two on this PC now), and a meeting started with the wrong title keeps it for ever. Also a privacy matter: a person asks for a recording to be removed.
 - **Cost.** Half a session; one new command in the core. Deletion is permanent, so it gets the confirmation.

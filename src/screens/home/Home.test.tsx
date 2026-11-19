@@ -254,6 +254,116 @@ describe('Home', () => {
     expect(useApp.getState().sheet).toBeNull()
   })
 
+  it('renames a meeting where its title stands', async () => {
+    render(<HomeList />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: /UDO order review/ })
+    )
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'More for UDO order review' })
+    )
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }))
+
+    const box = await screen.findByRole('textbox', { name: 'Meeting title' })
+    expect(box).toHaveValue('UDO order review')
+    fireEvent.change(box, { target: { value: '  UDO reorder  ' } })
+    fireEvent.keyDown(box, { key: 'Enter' })
+
+    expect(
+      await screen.findByRole('heading', { name: 'UDO reorder' })
+    ).toBeVisible()
+    expect(screen.getByRole('list', { name: 'Meetings' })).toHaveTextContent(
+      'UDO reorder'
+    )
+    expect(screen.queryByRole('textbox', { name: 'Meeting title' })).toBeNull()
+  })
+
+  it('leaves the title alone on Escape, and when it is emptied', async () => {
+    render(<HomeList />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: /UDO order review/ })
+    )
+    const rename = async () => {
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'More for UDO order review' })
+      )
+      fireEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }))
+      return screen.findByRole('textbox', { name: 'Meeting title' })
+    }
+    let box = await rename()
+    fireEvent.change(box, { target: { value: 'Something else' } })
+    fireEvent.keyDown(box, { key: 'Escape' })
+    expect(
+      await screen.findByRole('heading', { name: 'UDO order review' })
+    ).toBeVisible()
+
+    box = await rename()
+    fireEvent.change(box, { target: { value: '   ' } })
+    fireEvent.keyDown(box, { key: 'Enter' })
+    expect(
+      await screen.findByRole('heading', { name: 'UDO order review' })
+    ).toBeVisible()
+  })
+
+  it('deletes a meeting only after saying what goes, and takes its actions off the list', async () => {
+    render(<HomeList />)
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Custore weekly team meeting/ })
+    )
+    await screen.findByRole('tab', { name: 'Open actions (11)' })
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'More for Custore weekly team meeting',
+      })
+    )
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }))
+
+    const asking = await screen.findByRole('dialog', {
+      name: 'Delete this meeting?',
+    })
+    expect(asking).toHaveTextContent('“Custore weekly team meeting”')
+    expect(asking).toHaveTextContent('00:52:00 recorded')
+    expect(asking).toHaveTextContent(
+      'Its recording, transcript, notes and summary are removed from this PC.'
+    )
+    await waitFor(() =>
+      expect(asking).toHaveTextContent('The 11 open actions from it go too.')
+    )
+    expect(asking).toHaveTextContent('This cannot be undone.')
+
+    // Keeping it changes nothing.
+    fireEvent.click(within(asking).getByRole('button', { name: 'Keep it' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('list', { name: 'Meetings' })).toHaveTextContent(
+      'Custore weekly team meeting'
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'More for Custore weekly team meeting',
+      })
+    )
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }))
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: 'Delete meeting',
+      })
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByRole('list', { name: 'Meetings' })
+      ).not.toHaveTextContent('Custore weekly team meeting')
+    )
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(
+      await screen.findByRole('tab', { name: 'Open actions (0)' })
+    ).toBeVisible()
+    // The right side shows the next meeting, not the one that is gone.
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Bench 60' })
+    ).toBeVisible()
+  })
+
   it('opens the Pre-meeting sheet from New meeting', async () => {
     render(<HomeEmpty />)
     fireEvent.click(await screen.findByRole('button', { name: 'New meeting' }))

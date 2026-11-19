@@ -402,6 +402,40 @@ test.describe('actions that carry over', () => {
   })
 })
 
+test.describe('meetings on Home', () => {
+  test('a meeting is renamed in place, and deleted after a confirmation', async ({
+    page,
+  }) => {
+    await page.goto('/?screen=home-list')
+    const list = page.getByRole('list', { name: 'Meetings' })
+    await list.getByRole('button', { name: /BNI one-to-one/ }).click()
+
+    await page.getByRole('button', { name: 'More for BNI one-to-one' }).click()
+    await page.getByRole('menuitem', { name: 'Rename' }).click()
+    const box = page.getByRole('textbox', { name: 'Meeting title' })
+    await expect(box).toBeFocused()
+    await box.fill('BNI: Priya')
+    await box.press('Enter')
+    await expect(list).toContainText('BNI: Priya')
+
+    await page.getByRole('button', { name: 'More for BNI: Priya' }).click()
+    await page.getByRole('menuitem', { name: 'Delete…' }).click()
+    const asking = page.getByRole('dialog', { name: 'Delete this meeting?' })
+    await expect(asking).toContainText('This cannot be undone.')
+    // Escape is "no".
+    await page.keyboard.press('Escape')
+    await expect(asking).toHaveCount(0)
+    await expect(list).toContainText('BNI: Priya')
+
+    await page.getByRole('button', { name: 'More for BNI: Priya' }).click()
+    await page.getByRole('menuitem', { name: 'Delete…' }).click()
+    await asking.getByRole('button', { name: 'Delete meeting' }).click()
+    await expect(asking).toHaveCount(0)
+    await expect(list).not.toContainText('BNI: Priya')
+    await expect(list.getByRole('button')).toHaveCount(3)
+  })
+})
+
 test.describe('states', () => {
   test('with no microphone the screen says so and offers a way out', async ({
     page,

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Pin } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import type { CardRow, MeetingInfo } from '@/ipc'
 import { useApp } from '@/lib/app-state'
@@ -8,6 +8,7 @@ import { useBackend } from '@/lib/backend'
 import { OwnerChip } from '../live/CardRow'
 import { clock } from '../live/format'
 import { KindIcon } from '../live/KindIcon'
+import { MeetingMenu, TitleBox } from './MeetingMenu'
 import { outlineOf } from './outline'
 
 // The selected meeting at a glance (UI_SPEC §3.1): what was decided, who
@@ -86,6 +87,7 @@ export function MeetingPreview({ meeting }: { meeting: MeetingInfo }) {
   const backend = useBackend()
   const go = useApp(app => app.go)
   const openSheet = useApp(app => app.open)
+  const [renaming, setRenaming] = useState(false)
   const map = useQuery({
     queryKey: ['map', meeting.id],
     queryFn: () => backend.mapLoad(meeting.id),
@@ -102,7 +104,11 @@ export function MeetingPreview({ meeting }: { meeting: MeetingInfo }) {
     <div className="mx-auto flex max-w-[720px] flex-col gap-4 p-6">
       <header className="flex items-start gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h2 className="text-title font-semibold">{meeting.title}</h2>
+          {renaming ? (
+            <TitleBox meeting={meeting} onDone={() => setRenaming(false)} />
+          ) : (
+            <h2 className="text-title font-semibold">{meeting.title}</h2>
+          )}
           <p className="font-mono text-meta text-text-muted">
             {when.format(meeting.created_at_ms)} ·{' '}
             {!recorded
@@ -135,6 +141,7 @@ export function MeetingPreview({ meeting }: { meeting: MeetingInfo }) {
           New meeting like this
         </Button>
         <Button onClick={() => open()}>Open</Button>
+        <MeetingMenu meeting={meeting} onRename={() => setRenaming(true)} />
       </header>
 
       {meeting.agenda.length > 0 && (

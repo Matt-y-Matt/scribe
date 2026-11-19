@@ -165,6 +165,48 @@ pub async fn get_meeting(
         .ok_or(AppError::NotFound)
 }
 
+/// Gives a meeting a new title.
+#[tauri::command]
+#[specta::specta]
+pub async fn rename_meeting(
+    state: State<'_, AppState>,
+    meeting_id: String,
+    title: String,
+) -> CommandResult<MeetingInfo> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Err(AppError::Storage("a meeting needs a title".into()));
+    }
+    state
+        .store
+        .rename_meeting(&meeting_id, title)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
+/// Deletes a meeting for good: its recording first, then everything the
+/// database holds about it. A meeting being recorded is refused (`busy`).
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_meeting(state: State<'_, AppState>, meeting_id: String) -> CommandResult<()> {
+    if state.session.is_active(&meeting_id).await {
+        return Err(AppError::Busy);
+    }
+    state
+        .store
+        .meeting(&meeting_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    // Its files may be open for playing.
+    state.playback.stop();
+    // The audio goes first: if anything is left behind by a failure, it is
+    // a meeting in the list with no sound, not sound with no meeting.
+    crate::session::remove_meeting_files(&state.data_dir, &meeting_id)
+        .map_err(|error| AppError::Storage(error.to_string()))?;
+    state.store.delete_meeting(&meeting_id).await?;
+    Ok(())
+}
+
 /// The meeting's written summary; empty until the end screen writes one.
 #[tauri::command]
 #[specta::specta]
@@ -556,6 +598,8 @@ pub fn builder() -> Builder<tauri::Wry> {
             create_meeting,
             list_meetings,
             get_meeting,
+            rename_meeting,
+            delete_meeting,
             get_summary,
             save_summary,
             open_actions,

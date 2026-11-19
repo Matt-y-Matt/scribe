@@ -39,6 +39,29 @@ async getMeeting(meetingId: string) : Promise<Result<MeetingInfo, AppError>> {
 }
 },
 /**
+ * Gives a meeting a new title.
+ */
+async renameMeeting(meetingId: string, title: string) : Promise<Result<MeetingInfo, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("rename_meeting", { meetingId, title }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
+ * Deletes a meeting for good: its recording first, then everything the
+ * database holds about it. A meeting being recorded is refused (`busy`).
+ */
+async deleteMeeting(meetingId: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("delete_meeting", { meetingId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+/**
  * The meeting's written summary; empty until the end screen writes one.
  */
 async getSummary(meetingId: string) : Promise<Result<Summary, AppError>> {

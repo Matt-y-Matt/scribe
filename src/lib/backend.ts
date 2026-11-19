@@ -34,6 +34,12 @@ export interface Backend {
   listMeetings(): Promise<MeetingInfo[]>
   getMeeting(meetingId: string): Promise<MeetingInfo>
   createMeeting(meeting: NewMeeting): Promise<MeetingInfo>
+  renameMeeting(meetingId: string, title: string): Promise<MeetingInfo>
+  /**
+   * Deletes a meeting for good: recording, transcript, notes, summary.
+   * Rejects with `busy` for the meeting being recorded.
+   */
+  deleteMeeting(meetingId: string): Promise<void>
   unfinishedMeetings(): Promise<MeetingInfo[]>
   recoverMeeting(meetingId: string, modelId: string): Promise<Recovered>
   /** The written summary; both fields null until one has been saved. */
@@ -136,6 +142,9 @@ export const tauriBackend: Backend = {
   listMeetings: () => ok(commands.listMeetings()),
   getMeeting: meetingId => ok(commands.getMeeting(meetingId)),
   createMeeting: meeting => ok(commands.createMeeting(meeting)),
+  renameMeeting: (meetingId, title) =>
+    ok(commands.renameMeeting(meetingId, title)),
+  deleteMeeting: meetingId => done(commands.deleteMeeting(meetingId)),
   unfinishedMeetings: () => ok(commands.unfinishedMeetings()),
   recoverMeeting: (meetingId, modelId) =>
     ok(commands.recoverMeeting(meetingId, modelId)),
