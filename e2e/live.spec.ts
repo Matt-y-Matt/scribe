@@ -394,6 +394,72 @@ test.describe('editing by hand', () => {
   })
 })
 
+test.describe('from the keyboard and in one click', () => {
+  test('A writes an action on the topic on the table; @name gives it an owner', async ({
+    page,
+  }) => {
+    const errors = await open(page, 'live')
+    await topic(page, 'Lead times')
+      .getByRole('heading', { name: 'Lead times' })
+      .click()
+    const before = await viewport(page)
+
+    await page.keyboard.press('a')
+    const form = topic(page, 'Lead times').getByRole('form', {
+      name: 'New card',
+    })
+    await expect(form.getByRole('radio', { name: 'Action' })).toBeChecked()
+    await expect(form.getByLabel('Card text')).toBeFocused()
+    // The key that opened the box is not typed into it.
+    await expect(form.getByLabel('Card text')).toHaveValue('')
+    await page.keyboard.type('Chase the Dongguan quote @zach')
+    await page.keyboard.press('Enter')
+
+    const added = topic(page, 'Lead times')
+      .getByRole('listitem')
+      .filter({ hasText: 'Chase the Dongguan quote' })
+    await expect(added).toContainText('Zach')
+    await expect(added).not.toContainText('@zach')
+    await expect(added).toHaveAttribute('data-kind', 'action')
+    // The topic was in view: the map stayed where it was.
+    expect(await viewport(page)).toBe(before)
+
+    await page.keyboard.press('d')
+    await expect(
+      topic(page, 'Lead times')
+        .getByRole('form', { name: 'New card' })
+        .getByRole('radio', { name: 'Decision' })
+    ).toBeChecked()
+    await page.keyboard.press('Escape')
+    expect(errors).toEqual([])
+  })
+
+  test('the owner chip gives an action to someone else in two clicks', async ({
+    page,
+  }) => {
+    await open(page, 'live')
+    const row = topic(page, 'Lead times')
+      .getByRole('listitem')
+      .filter({ hasText: 'Draft the two options for UDO' })
+    await row.getByRole('button', { name: 'Owner: Zach. Change' }).click()
+    await page.getByRole('menuitem', { name: 'Kabs' }).click()
+    await expect(
+      row.getByRole('button', { name: 'Owner: Kabs. Change' })
+    ).toBeVisible()
+    // The clicks did not play the card.
+    expect(
+      await page.evaluate(
+        () => window.__scribe?.session.getState().playback.playing
+      )
+    ).toBe(false)
+
+    await page.keyboard.press('Control+z')
+    await expect(
+      row.getByRole('button', { name: 'Owner: Zach. Change' })
+    ).toBeVisible()
+  })
+})
+
 test.describe('search (Ctrl+K)', () => {
   test('finds a card and brings its topic into view; Escape leaves the map alone', async ({
     page,

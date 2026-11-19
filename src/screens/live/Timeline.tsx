@@ -23,6 +23,12 @@ const STEP_MS = 10_000
 const REDRAW_MS = 2_000
 /** A drag shorter than this is a click, not a highlight. */
 const MIN_HIGHLIGHT_MS = 300
+/** What M keeps: long enough to hold the sentence that was just said. */
+const KEEP_MS = 20_000
+/** The most of what was said that a quote card carries. */
+const QUOTE_CHARS = 240
+/** How long the timeline says what M kept. */
+const KEPT_NOTE_MS = 5_000
 
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement &&
@@ -294,6 +300,8 @@ export function Timeline() {
   const [pending, setPending] = useState<Span | null>(null)
   const [markedAt, setMarkedAt] = useState<number | null>(null)
   const [name, setName] = useState('')
+  /** The span just kept with M, said back for a few seconds. */
+  const [kept, setKept] = useState<Span | null>(null)
 
   const live = !review && (rec === 'recording' || rec === 'paused')
   const recordedMs = Math.max(
@@ -334,9 +342,58 @@ export function Timeline() {
     if (span.t1 - span.t0 >= MIN_HIGHLIGHT_MS) setPending(span)
   }
 
-  const keys = useRef({ toggle, seek, mark, cursorMs })
+  /**
+   * Keeps a span: a highlight on the waveform and a quote card on the map,
+   * under the topic on the table. Ctrl+Z takes the card back.
+   */
+  const keep = (span: Span, label: string, latest = false) => {
+    const said = segments.filter(
+      segment => segment.t1_ms > span.t0 && segment.t0_ms < span.t1
+    )
+    actions.addHighlight(span.t0, span.t1, label)
+
+    const state = store.getState()
+    const [header] = headersOf(state)
+    const topicId =
+      activeTopicId ??
+      Object.values(state.topics).find(topic => topic.kind === 'topic')?.id ??
+      (header && addTopic(store, header.id, 'Highlights')?.id)
+    const all = said.map(segment => segment.text).join(' ')
+    // A span that was dragged is quoted from its start. What M keeps is
+    // quoted from its end: the host pressed it because of the last thing said.
+    const words =
+      all.length <= QUOTE_CHARS
+        ? all
+        : latest
+          ? `…${all.slice(-QUOTE_CHARS).replace(/^\S*\s/, '')}`
+          : all.slice(0, QUOTE_CHARS)
+    if (topicId) {
+      addCard(store, topicId, {
+        kind: 'quote',
+        text: label || words || `Highlight at ${clock(span.t0)}`,
+        segment_ids: said.map(segment => segment.id),
+        t_ms: span.t0,
+      })
+    }
+  }
+
+  // M: something worth keeping was just said. No drag, no name: the last
+  // twenty seconds are kept at once, and the card can be reworded later.
+  const keepLast = () => {
+    const span = { t0: Math.max(0, cursorMs - KEEP_MS), t1: cursorMs }
+    if (!hasAudio || span.t1 - span.t0 < MIN_HIGHLIGHT_MS) return
+    keep(span, '', true)
+    setKept(span)
+  }
   useEffect(() => {
-    keys.current = { toggle, seek, mark, cursorMs }
+    if (!kept) return
+    const timer = setTimeout(() => setKept(null), KEPT_NOTE_MS)
+    return () => clearTimeout(timer)
+  }, [kept])
+
+  const keys = useRef({ toggle, seek, mark, keepLast, cursorMs })
+  useEffect(() => {
+    keys.current = { toggle, seek, mark, keepLast, cursorMs }
   })
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -351,6 +408,7 @@ export function Timeline() {
       } else if (event.key === '[') now.seek(now.cursorMs - STEP_MS)
       else if (event.key === ']') now.seek(now.cursorMs + STEP_MS)
       else if (event.key.toLowerCase() === 'h') now.mark()
+      else if (event.key.toLowerCase() === 'm') now.keepLast()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
@@ -358,32 +416,7 @@ export function Timeline() {
 
   const save = () => {
     if (!pending) return
-    const label = name.trim()
-    const said = segments.filter(
-      segment => segment.t1_ms > pending.t0 && segment.t0_ms < pending.t1
-    )
-    actions.addHighlight(pending.t0, pending.t1, label)
-
-    // A highlight is a quote: it goes on the map under the topic on the
-    // table, and Ctrl+Z takes the card back.
-    const state = store.getState()
-    const [header] = headersOf(state)
-    const topicId =
-      activeTopicId ??
-      Object.values(state.topics).find(topic => topic.kind === 'topic')?.id ??
-      (header && addTopic(store, header.id, 'Highlights')?.id)
-    const words = said
-      .map(segment => segment.text)
-      .join(' ')
-      .slice(0, 240)
-    if (topicId) {
-      addCard(store, topicId, {
-        kind: 'quote',
-        text: label || words || `Highlight at ${clock(pending.t0)}`,
-        segment_ids: said.map(segment => segment.id),
-        t_ms: pending.t0,
-      })
-    }
+    keep(pending, name.trim())
     setPending(null)
     setName('')
   }
@@ -426,6 +459,15 @@ export function Timeline() {
         >
           10▶
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          title="Keep the last 20 seconds as a quote (M)"
+          disabled={!hasAudio}
+          onClick={keepLast}
+        >
+          Mark
+        </Button>
 
         {pending ? (
           <form
@@ -458,13 +500,15 @@ export function Timeline() {
           </form>
         ) : (
           <p className="ml-2 min-w-0 flex-1 truncate text-secondary text-text-muted">
-            {markedAt !== null
-              ? `Highlight started at ${clock(markedAt)}. Press H again to end it.`
-              : hasAudio
-                ? 'Click to play from there. Drag, or press H twice, to mark a highlight.'
-                : review
-                  ? 'This meeting has no recording.'
-                  : 'The waveform appears as the meeting is recorded.'}
+            {kept
+              ? `Kept ${clock(kept.t0)}–${clock(kept.t1)} as a quote on the map. Ctrl+Z takes it back.`
+              : markedAt !== null
+                ? `Highlight started at ${clock(markedAt)}. Press H again to end it.`
+                : hasAudio
+                  ? 'Click to play from there. M keeps the last 20 seconds; drag to mark a span.'
+                  : review
+                    ? 'This meeting has no recording.'
+                    : 'The waveform appears as the meeting is recorded.'}
           </p>
         )}
 

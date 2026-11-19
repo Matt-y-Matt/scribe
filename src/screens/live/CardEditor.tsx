@@ -1,11 +1,20 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react'
 import { Button } from '@/components/ui/button'
 import { addCard, deleteCard, editCard } from '@/engine/actions'
 import { CARD_KINDS, type Card, type CardKind } from '@/engine/model'
 import { cn } from '@/lib/utils'
+import { wallClockMs } from './format'
 import { KindIcon } from './KindIcon'
 import { KIND_LABEL } from './kinds'
 import { useLive } from './live-context'
+import { knownOwners, ownerMention } from './owners'
+import { claimTyping } from './type-ahead'
 
 // A card being written or changed by hand (PRD F4.6): its text, its kind,
 // and for an action who owes it and by when. It sits in the card's own row,
@@ -15,29 +24,22 @@ import { useLive } from './live-context'
 const field =
   'w-full rounded-md border bg-surface px-1.5 text-body outline-none placeholder:text-text-muted focus:border-accent'
 
-/** The names an owner is most likely to be: the room, then who already owes. */
-function knownOwners(
-  participants: readonly string[],
-  cards: Iterable<Card>
-): string[] {
-  const names = new Set(participants)
-  for (const card of cards) if (card.owner) names.add(card.owner)
-  return [...names]
-}
-
 export function CardEditor({
   card,
   topicId,
+  kind: startKind = 'note',
   onDone,
 }: {
   /** The card being changed. Without one, a new card for `topicId`. */
   card?: Card
   topicId: string
+  /** The kind a new card starts as: N, A or D was pressed. */
+  kind?: CardKind
   onDone: () => void
 }) {
   const { store, state, notify, session } = useLive()
   const [text, setText] = useState(card?.text ?? '')
-  const [kind, setKind] = useState<CardKind>(card?.kind ?? 'note')
+  const [kind, setKind] = useState<CardKind>(card?.kind ?? startKind)
   const [owner, setOwner] = useState(card?.owner ?? '')
   const [due, setDue] = useState(card?.due_text ?? '')
   const [done, setDone] = useState(
@@ -46,25 +48,32 @@ export function CardEditor({
   const owners = useId()
   const textBox = useRef<HTMLTextAreaElement>(null)
 
-  // Open ready to type on, at the end of what is there.
-  useEffect(() => {
+  // Open ready to type on, at the end of what is there. Before the browser
+  // paints, so no key falls between the box appearing and it having focus;
+  // what was typed while it was on its way (type-ahead.ts) goes in first.
+  useLayoutEffect(() => {
     const box = textBox.current
     if (!box) return
-    box.focus()
+    // Without moving the map under the host (rule 4.2).
+    box.focus({ preventScroll: true })
     box.setSelectionRange(box.value.length, box.value.length)
+    claimTyping(typed => setText(written => written + typed))
   }, [])
 
   // Who and when belong to actions; a card that already has them keeps them
   // in view, whatever its kind.
   const owed = kind === 'action' || !!card?.owner || !!card?.due_text
-  const ready = text.trim() !== ''
+  const names = knownOwners(state)
+  // "@kabs" while typing gives the card to Kabs, and makes a note an action.
+  const mention = ownerMention(text, names)
+  const ready = (mention?.text ?? text).trim() !== ''
 
   const save = () => {
     if (!ready) return
     const fields = {
-      kind,
-      text: text.trim(),
-      owner: owner.trim() || null,
+      kind: mention && kind === 'note' ? ('action' as const) : kind,
+      text: (mention?.text ?? text).trim(),
+      owner: mention?.owner ?? (owner.trim() || null),
       due_text: due.trim() || null,
     }
     if (card) {
@@ -72,7 +81,9 @@ export function CardEditor({
         ...fields,
         // Keep the day it was done; only a change of mind changes it.
         done_at_ms:
-          kind === 'action' && done ? (card.done_at_ms ?? Date.now()) : null,
+          fields.kind === 'action' && done
+            ? (card.done_at_ms ?? wallClockMs())
+            : null,
       })
     }
     // A card the host writes once the meeting is over is one they vouch
@@ -119,6 +130,13 @@ export function CardEditor({
         className={cn(field, 'resize-none py-1')}
       />
 
+      {mention && (
+        <p role="status" className="text-meta text-text-muted">
+          {mention.owner} will own this
+          {kind === 'note' ? ', as an action' : ''}.
+        </p>
+      )}
+
       <div role="radiogroup" aria-label="Kind" className="flex gap-1">
         {CARD_KINDS.map(option => (
           <button
@@ -154,10 +172,7 @@ export function CardEditor({
             className={cn(field, 'h-6 min-w-0 flex-1')}
           />
           <datalist id={owners}>
-            {knownOwners(
-              state.meeting.participants,
-              Object.values(state.cards)
-            ).map(name => (
+            {names.map(name => (
               <option key={name} value={name} />
             ))}
           </datalist>

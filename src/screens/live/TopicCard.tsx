@@ -3,6 +3,7 @@ import { Pin } from 'lucide-react'
 import { useState, type KeyboardEvent } from 'react'
 import { renameTopic } from '@/engine/actions'
 import {
+  CARD_KINDS,
   cardsIn,
   openSuggestions,
   type Card,
@@ -111,7 +112,12 @@ export function TopicCard({ topicId }: { topicId: string }) {
     ({ payload }) => payload.kind === 'pin' && payload.topic_id === topic.id
   )
   const active = activeTopicId === topic.id
-  const adding = editingId === `new:${topic.id}`
+  // "new:<kind>:<topic id>": a card being written here, of that kind.
+  const adding =
+    editingId?.startsWith('new:') && editingId.endsWith(`:${topic.id}`)
+  const addingKind = CARD_KINDS.find(
+    kind => editingId === `new:${kind}:${topic.id}`
+  )
 
   return (
     <section
@@ -159,7 +165,7 @@ export function TopicCard({ topicId }: { topicId: string }) {
           <TopicMenu
             topic={topic}
             onRename={() => setRenaming(true)}
-            onAddCard={() => setEditingId(`new:${topic.id}`)}
+            onAddCard={() => setEditingId(`new:note:${topic.id}`)}
           />
         </header>
       )}
@@ -174,7 +180,9 @@ export function TopicCard({ topicId }: { topicId: string }) {
           {adding && (
             <li className="nodrag nopan flex border-l-[3px] border-l-border pr-2 pl-[5px]">
               <CardEditor
+                key={addingKind}
                 topicId={topic.id}
+                kind={addingKind}
                 onDone={() => setEditingId(null)}
               />
             </li>

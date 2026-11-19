@@ -6,6 +6,9 @@ export function clock(ms: number): string {
   return `${pad(Math.floor(seconds / 3600))}:${pad(Math.floor(seconds / 60) % 60)}:${pad(seconds % 60)}`
 }
 
+/** The time on the wall, in milliseconds since 1970: when a thing was done. */
+export const wallClockMs = (): number => Date.now()
+
 /**
  * The letters on an owner chip: the initials of a full name, or the first two
  * letters of a single one, so Matt and Mei do not both become "M".

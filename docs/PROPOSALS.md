@@ -23,22 +23,22 @@ The test for every item: does it get an action out of the room with an owner and
 - **Why.** The weekly meeting should take one click and a glance to start, not twenty seconds of typing while the room waits.
 - **Cost.** Half a session. Screens only.
 
-### C. Read-back before people leave
+### C. Read-back before people leave — built 2026-11-19, see NOTES
 - **What.** On the end screen, `Read back`: the ticked actions in large type, one person at a time, with owner and date, and `Next`. The host reads it to the room; anyone can object while they are still there. A wrong owner is fixed with one click on a name.
 - **Why.** PRD §2: the summary arrives after the moment to fix it has passed. This is that moment, and it takes thirty seconds. It is also the first thing a new team sees the product do for them.
 - **Cost.** Half a session. It reads the same data as the drafts.
 
-### D. One key to keep a moment
+### D. One key to keep a moment — built 2026-11-19, see NOTES
 - **What.** `M` (and a `Mark` button on the timeline) keeps the last 20 seconds as a highlight, at once, with no naming step; the name can be typed afterwards. Today a highlight is a drag on the waveform or `H` twice, both of which need the host to know in advance that something worth keeping is about to be said.
 - **Why.** People notice a good line after it is said.
 - **Cost.** An hour or two. Uses the highlight code that exists.
 
-### E. Type a card without leaving the keyboard
+### E. Type a card without leaving the keyboard — built 2026-11-19, see NOTES
 - **What.** `N` note, `A` action, `D` decision: opens the new-card editor (built today) on the active topic with that kind chosen. In the editor, typing `@` offers the people in the meeting as owner.
 - **Why.** The model misses things. The host adding one line should cost three seconds and no mouse.
 - **Cost.** Two hours.
 
-### F. An owner in one click on the map
+### F. An owner in one click on the map — built 2026-11-19, see NOTES
 - **What.** An action with no owner shows a dashed `?` chip. Clicking it lists the people in the meeting; one click assigns. The same list appears on a click of an existing chip.
 - **Why.** "Who owes it" is the most common fix, and today it is pencil → field → type → save.
 - **Cost.** Two hours.

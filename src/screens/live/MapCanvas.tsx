@@ -24,8 +24,8 @@ import {
 import { ArrowDown } from 'lucide-react'
 import { useEffect, useRef, useState, type ActionDispatch } from 'react'
 import { Button } from '@/components/ui/button'
-import { moveCard, moveTopic, pinTopic } from '@/engine/actions'
-import type { Card } from '@/engine/model'
+import { addTopic, moveCard, moveTopic, pinTopic } from '@/engine/actions'
+import { headersOf, type Card, type CardKind } from '@/engine/model'
 import type { CanvasAction, CanvasState } from './canvas-state'
 import { CardFace, type DropTarget } from './CardRow'
 import { KIND_BAR } from './kinds'
@@ -33,6 +33,7 @@ import { columnAt, TOPIC_WIDTH } from './layout'
 import { useLive } from './live-context'
 import { HeaderColumn, TopicNodeView } from './MapNodes'
 import { buildNodes, type MapNode } from './nodes'
+import { holdTyping } from './type-ahead'
 
 // The map, UI_SPEC §2.2: a React Flow canvas of header columns and topics.
 // The viewport belongs to the host. Nothing here pans or zooms by itself
@@ -42,6 +43,11 @@ export const MIN_ZOOM = 0.4
 export const MAX_ZOOM = 1.5
 /** Below this, cards collapse to kind icons with counts. */
 export const COLLAPSE_ZOOM = 0.7
+
+/** Room for the new-card box under a topic, in map pixels. */
+const EDITOR_HEIGHT = 190
+/** The strip at the bottom of the map where Tidy, Fit and zoom sit. */
+const CONTROLS_HEIGHT = 56
 
 const NODE_TYPES: NodeTypes = { header: HeaderColumn, topic: TopicNodeView }
 
@@ -78,7 +84,7 @@ function Flow({
   onZoom,
   focus,
 }: MapCanvasProps) {
-  const { store, state, tidy, activeTopicId } = useLive()
+  const { store, state, tidy, activeTopicId, setEditingId } = useLive()
   const flow = useReactFlow<MapNode>()
   const wrapper = useRef<HTMLDivElement>(null)
   const [dragged, setDragged] = useState<Card | null>(null)
@@ -150,6 +156,49 @@ function Flow({
     )
   }, [focus, flow])
 
+  // N, A, D: write a note, an action or a decision on the topic on the
+  // table, without reaching for the mouse.
+  const writeCard = (kind: CardKind) => {
+    const map = store.getState()
+    const [header] = headersOf(map)
+    const topicId =
+      activeTopicId ??
+      Object.values(map.topics).find(topic => topic.kind === 'topic')?.id ??
+      // Nothing has been said yet: the host's notes get a topic of their own.
+      (header && addTopic(store, header.id, 'Notes')?.id)
+    if (!topicId) return
+    // People type at once; the box needs a moment. Nothing typed is lost.
+    holdTyping()
+    setEditingId(`new:${kind}:${topicId}`)
+    // The host asked to write there, so the map may go there (rule 4.2),
+    // but only if the box, which opens at the end of the topic, would be
+    // out of sight. Then the end of the topic is brought to the bottom edge.
+    const node = flow.getInternalNode(topicId)
+    const frame = wrapper.current?.getBoundingClientRect()
+    if (!node || !frame) return
+    const { x, y, zoom } = flow.getViewport()
+    const at = node.internals.positionAbsolute
+    const end = at.y + (node.measured.height ?? 0) + EDITOR_HEIGHT
+    const left = at.x * zoom + x
+    const seenAcross = left >= 0 && left + TOPIC_WIDTH * zoom <= frame.width
+    const seenDown =
+      end * zoom + y <= frame.height - CONTROLS_HEIGHT &&
+      (end - EDITOR_HEIGHT) * zoom + y >= 0
+    if (seenAcross && seenDown) return
+    void flow.setViewport(
+      {
+        x: seenAcross ? x : 16 - at.x * zoom,
+        y: seenDown ? y : frame.height - CONTROLS_HEIGHT - end * zoom,
+        zoom,
+      },
+      { duration: 0 }
+    )
+  }
+  const keys = useRef({ writeCard })
+  useEffect(() => {
+    keys.current = { writeCard }
+  })
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isTyping(event.target) || event.altKey) return
@@ -169,6 +218,12 @@ function Flow({
       if (key === 't') tidy()
       // P pins the topic on the table (UI_SPEC §4.6); Ctrl+Z takes it back.
       if (key === 'p' && activeTopicId) pinTopic(store, activeTopicId)
+      const kind = ({ n: 'note', a: 'action', d: 'decision' } as const)[key]
+      if (kind) {
+        // Not into the box that is about to open.
+        event.preventDefault()
+        keys.current.writeCard(kind)
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)

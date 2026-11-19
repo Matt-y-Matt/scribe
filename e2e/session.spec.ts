@@ -194,6 +194,30 @@ test.describe('timeline', () => {
     expect(errors).toEqual([])
   })
 
+  test('M keeps the last twenty seconds at once, as a quote on the map', async ({
+    page,
+  }) => {
+    await open(page, 'live')
+    const before = (await session(page)).highlights?.length ?? 0
+    await page.keyboard.press('m')
+
+    await expect(page.getByRole('region', { name: 'Timeline' })).toContainText(
+      'as a quote on the map'
+    )
+    const now = await session(page)
+    expect(now.highlights).toHaveLength(before + 1)
+    const [t0, t1] = now.highlights?.at(-1) ?? [0, 0]
+    expect(Number(t1) - Number(t0)).toBe(20_000)
+    expect(t1).toBe(now.elapsedMs)
+    await expect(page.locator('[data-kind=quote]').last()).toContainText(
+      "I'll message the landlord"
+    )
+
+    // The button does the same, and Ctrl+Z takes a card back.
+    await page.getByRole('button', { name: 'Mark' }).click()
+    expect((await session(page)).highlights).toHaveLength(before + 2)
+  })
+
   test('Escape drops a highlight that was not named', async ({ page }) => {
     await open(page, 'live')
     await expect(waveform(page).locator('canvas').first()).toBeVisible()
@@ -280,6 +304,36 @@ test.describe('the end of a meeting', () => {
       /Write the CLA quote/
     )
     expect(errors).toEqual([])
+  })
+
+  test('Read back goes through the actions one person at a time', async ({
+    page,
+  }) => {
+    await open(page, 'end')
+    await page.getByRole('button', { name: 'Read back' }).click()
+    const reading = page.getByRole('dialog', { name: 'Read back' })
+    await expect(reading).toContainText('1 of 4')
+    await expect(reading.getByRole('heading', { level: 3 })).toContainText(
+      'Matt'
+    )
+
+    await page.keyboard.press('ArrowRight')
+    await expect(reading.getByRole('heading', { level: 3 })).toContainText(
+      'Kabs'
+    )
+    // Not Kabs's after all: one click, and it is in Ant's draft.
+    await reading
+      .getByRole('group', { name: 'Who owns: Get the Pantone from Ross' })
+      .getByRole('button', { name: 'Ant' })
+      .click()
+    await expect(reading.getByRole('heading', { level: 3 })).toContainText(
+      '2 actions'
+    )
+    await page.keyboard.press('Escape')
+    await expect(reading).toHaveCount(0)
+    await expect(page.getByLabel('Draft for Ant')).toHaveValue(
+      /Get the Pantone from Ross/
+    )
   })
 
   test('the map and the recording are one click away, and Summary comes back', async ({

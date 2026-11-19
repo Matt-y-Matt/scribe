@@ -5,6 +5,7 @@ import type { MapStore } from '@/engine/store'
 import { FIXTURE_PINS, fixtureStore } from './fixture'
 import { LiveHarness } from './harness'
 import { TopicCard } from './TopicCard'
+import { claimTyping, holdTyping } from './type-ahead'
 
 const topicNamed = (state: MapState, title: string) => {
   const topic = Object.values(state.topics).find(row => row.title === title)
@@ -190,6 +191,76 @@ describe('editing a card in place', () => {
     fireEvent.keyDown(within(form).getByLabelText('Card text'), { key: 'p' })
     window.removeEventListener('keydown', heard)
     expect(heard).not.toHaveBeenCalled()
+  })
+})
+
+describe('typing before the box is there', () => {
+  it('keeps the keys from the map and gives them to the box when it opens', async () => {
+    const store = fixtureStore({ pins: FIXTURE_PINS })
+    show(store, 'Artwork')
+    const heard = vi.fn()
+    window.addEventListener('keydown', heard)
+
+    holdTyping()
+    for (const key of ['S', 'e', 'n', 'x', 'Backspace', 'd']) {
+      fireEvent.keyDown(window, { key })
+    }
+    // Not one of them reached the map: no pin, no second box from the "n".
+    expect(heard).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menu for Artwork' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Add card' }))
+    const form = await screen.findByRole('form', { name: 'New card' })
+    expect(within(form).getByLabelText('Card text')).toHaveValue('Send')
+
+    // Once claimed, keys are the page's again.
+    fireEvent.keyDown(window, { key: 'q' })
+    expect(heard).toHaveBeenCalledTimes(1)
+    window.removeEventListener('keydown', heard)
+  })
+
+  it('lets go on Escape, and has nothing for a box that opens later', () => {
+    holdTyping()
+    fireEvent.keyDown(window, { key: 'a' })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    const take = vi.fn()
+    claimTyping(take)
+    expect(take).not.toHaveBeenCalled()
+  })
+})
+
+describe('@owner while typing', () => {
+  it('gives a new note to the person named, as an action', async () => {
+    const store = fixtureStore({ pins: FIXTURE_PINS })
+    const { topic } = show(store, 'Artwork')
+    fireEvent.click(screen.getByRole('button', { name: 'Menu for Artwork' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Add card' }))
+    const form = await screen.findByRole('form', { name: 'New card' })
+    fireEvent.change(within(form).getByLabelText('Card text'), {
+      target: { value: 'Ask for the font name @kabs' },
+    })
+    expect(within(form).getByRole('status')).toHaveTextContent(
+      'Kabs will own this, as an action.'
+    )
+    fireEvent.click(within(form).getByRole('button', { name: 'Add' }))
+
+    expect(cardsIn(store.getState(), topic.id).at(-1)).toMatchObject({
+      text: 'Ask for the font name',
+      kind: 'action',
+      owner: 'Kabs',
+    })
+  })
+
+  it('leaves an @ that names nobody in the meeting as it was typed', () => {
+    const store = fixtureStore({ pins: FIXTURE_PINS })
+    show(store, 'Artwork')
+    const form = openEditor(/Logo came as a WhatsApp JPG/)
+    fireEvent.change(within(form).getByLabelText('Card text'), {
+      target: { value: 'Logo came from ross@udo.sg' },
+    })
+    expect(within(form).queryByRole('status')).toBeNull()
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    expect(rowOf('Logo came from ross@udo.sg').dataset.kind).toBe('note')
   })
 })
 

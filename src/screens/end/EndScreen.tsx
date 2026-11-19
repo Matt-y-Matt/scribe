@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import { Button } from '@/components/ui/button'
 import { confirmCards } from '@/engine/actions'
@@ -12,6 +12,7 @@ import { useMapState } from '../live/live-context'
 import type { SessionActions, SessionStore } from '../live/session'
 import { ConfirmLists } from './ConfirmLists'
 import { Drafts } from './Drafts'
+import { ReadBack } from './ReadBack'
 import { SummaryPanel } from './SummaryPanel'
 
 // The end screen, UI_SPEC §3.3: where a meeting goes on Stop. The host reads
@@ -39,6 +40,7 @@ export function EndScreen({
   const state = useMapState(store)
   const meetingId = state.meeting.id
   const elapsedMs = useStore(session, live => live.elapsedMs)
+  const [readingBack, setReadingBack] = useState(false)
 
   const meeting = useQuery({
     queryKey: ['meeting', meetingId],
@@ -123,7 +125,7 @@ export function EndScreen({
   }
 
   return (
-    <main className="flex h-full flex-col bg-bg">
+    <main className="relative flex h-full flex-col bg-bg">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-surface px-3">
         <div className="flex items-center gap-2">
           <span className="size-2 rounded-full bg-text-muted" aria-hidden />
@@ -143,6 +145,14 @@ export function EndScreen({
         <span className="text-secondary text-text-muted">
           Nothing is sent from this screen.
         </span>
+        <Button
+          variant="outline"
+          title="The actions, one person at a time, to read to the room"
+          disabled={!wrap.actions.some(card => card.confirmed)}
+          onClick={() => setReadingBack(true)}
+        >
+          Read back
+        </Button>
         <Button onClick={actions.leave}>Finish</Button>
       </header>
 
@@ -186,6 +196,13 @@ export function EndScreen({
           )}
         </aside>
       </div>
+      {readingBack && (
+        <ReadBack
+          store={store}
+          state={state}
+          onClose={() => setReadingBack(false)}
+        />
+      )}
     </main>
   )
 }

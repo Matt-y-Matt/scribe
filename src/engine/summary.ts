@@ -91,7 +91,7 @@ function heading(meta: SummaryMeta): string[] {
 }
 
 /** People who owe something, in the order they were first given it. */
-function owners(actions: readonly Card[]): (string | null)[] {
+export function ownersOf(actions: readonly Card[]): (string | null)[] {
   const seen: (string | null)[] = []
   for (const card of actions) {
     if (!seen.includes(card.owner)) seen.push(card.owner)
@@ -121,7 +121,7 @@ export function renderSummary(
   const lines = heading(meta)
 
   if (preset === 'one-pager') {
-    const people = owners(actions).filter(owner => owner !== null).length
+    const people = ownersOf(actions).filter(owner => owner !== null).length
     lines.push(
       `${decisions.length} ${decisions.length === 1 ? 'decision' : 'decisions'}, ${actions.length} ${actions.length === 1 ? 'action' : 'actions'} for ${people} ${people === 1 ? 'person' : 'people'}.`,
       ''
@@ -132,7 +132,7 @@ export function renderSummary(
         decisions.map(card => `- ${card.text}`)
       )
     )
-    for (const owner of owners(actions)) {
+    for (const owner of ownersOf(actions)) {
       lines.push(
         ...section(
           owner ?? 'No owner yet',
@@ -205,7 +205,7 @@ export interface Draft {
  */
 export function draftsOf(state: MapState, title: string): Draft[] {
   const actions = wrapUpOf(state).actions.filter(card => card.confirmed)
-  return owners(actions).flatMap(owner => {
+  return ownersOf(actions).flatMap(owner => {
     if (owner === null) return []
     const mine = actions.filter(card => card.owner === owner)
     return [

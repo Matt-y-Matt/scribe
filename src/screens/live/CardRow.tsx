@@ -1,5 +1,6 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { Pencil } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useStore } from 'zustand'
 import type { Card } from '@/engine/model'
 import { cn } from '@/lib/utils'
@@ -8,6 +9,7 @@ import { clock, initials } from './format'
 import { KindIcon } from './KindIcon'
 import { KIND_BAR } from './kinds'
 import { useLive } from './live-context'
+import { OwnerPicker } from './OwnerPicker'
 
 /** What a card or a topic tells the drag handler when something lands on it. */
 export type DropTarget =
@@ -27,7 +29,14 @@ export function OwnerChip({ name }: { name: string }) {
 }
 
 /** The card as it looks, with no behaviour: also what follows the pointer. */
-export function CardFace({ card }: { card: Card }) {
+export function CardFace({
+  card,
+  chip,
+}: {
+  card: Card
+  /** Stands in for the owner chip: on the map it is a control. */
+  chip?: ReactNode
+}) {
   const meta = [
     clock(card.created_t_ms),
     card.owner,
@@ -46,9 +55,10 @@ export function CardFace({ card }: { card: Card }) {
           >
             {card.text}
           </p>
-          {card.kind === 'action' && card.owner && (
-            <OwnerChip name={card.owner} />
-          )}
+          {chip ??
+            (card.kind === 'action' && card.owner && (
+              <OwnerChip name={card.owner} />
+            ))}
         </div>
         {/* The meta line runs under the chip, so it stays on one line. */}
         <p className="font-mono text-meta text-text-muted">
@@ -155,7 +165,10 @@ export function CardRow({ card }: { card: Card }) {
           className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-accent"
         />
       )}
-      <CardFace card={card} />
+      <CardFace
+        card={card}
+        chip={card.kind === 'action' ? <OwnerPicker card={card} /> : undefined}
+      />
       {/* Out of the way until the card is pointed at or focused. */}
       <button
         type="button"

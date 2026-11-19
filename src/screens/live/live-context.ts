@@ -15,8 +15,8 @@ export interface LiveContextValue {
   /** Forgets every hand-placed position and lays the map out afresh. */
   tidy: () => void
   /**
-   * What is being edited in place: a card's id, or `new:` and a topic's id
-   * for a card being added to it. One at a time.
+   * What is being edited in place: a card's id, or `new:<kind>:<topic id>`
+   * for a card of that kind being added to that topic. One at a time.
    */
   editingId: string | null
   setEditingId: (id: string | null) => void
