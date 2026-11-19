@@ -1,8 +1,10 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { useStore } from 'zustand'
+import { dueNote, lateText } from '@/lib/due'
 import { cn } from '@/lib/utils'
 import { OwnerChip } from './CardRow'
+import { wallClockMs } from './format'
 import { useLive } from './live-context'
 
 // What is still owed from the earlier meetings of the same name, at the top
@@ -20,6 +22,7 @@ export function LastTime() {
   const owed = useStore(session, state => state.lastTime)
   const done = useStore(session, state => state.lastTimeDone)
   const [open, setOpen] = useState(true)
+  const [nowMs] = useState(() => wallClockMs())
   if (owed.length === 0) return null
 
   const left = owed.filter(row => !done.includes(row.card.id)).length
@@ -48,11 +51,9 @@ export function LastTime() {
         <ul className="flex min-h-0 flex-col overflow-y-auto px-2 pb-2">
           {owed.map(({ card, meeting_created_at_ms }) => {
             const ticked = done.includes(card.id)
-            const meta = [
-              card.owner,
-              card.due_text && `due ${card.due_text}`,
-              `from ${day.format(meeting_created_at_ms)}`,
-            ].filter(Boolean)
+            const due = dueNote(card.due_text, meeting_created_at_ms, nowMs)
+            const lateDays = ticked ? 0 : (due?.lateDays ?? 0)
+            const meta = [card.owner, due?.label].filter(Boolean)
             return (
               <li key={card.id}>
                 <label className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-1 hover:bg-surface-2">
@@ -75,7 +76,16 @@ export function LastTime() {
                       {card.text}
                     </span>
                     <span className="block text-meta text-text-muted">
-                      {meta.join(' · ')}
+                      {meta.map(part => `${part} · `)}
+                      {lateDays > 0 && (
+                        <>
+                          <span className="font-semibold whitespace-nowrap text-action">
+                            {lateText(lateDays)}
+                          </span>
+                          {' · '}
+                        </>
+                      )}
+                      from {day.format(meeting_created_at_ms)}
                     </span>
                   </span>
                   {card.owner && <OwnerChip name={card.owner} />}

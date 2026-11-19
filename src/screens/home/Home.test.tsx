@@ -186,9 +186,10 @@ describe('Home', () => {
 
     const kabs = await screen.findByRole('region', { name: 'Kabs' })
     expect(kabs).toHaveTextContent('3 open')
+    expect(kabs).toHaveTextContent('3 late')
     expect(kabs).toHaveTextContent('Call Ross and confirm the real headcount')
     expect(kabs).toHaveTextContent(
-      /due tomorrow · Custore weekly team meeting, .* · 00:01:12/
+      /due tomorrow \(.+\) · 1 day late · Custore weekly team meeting, .* · 00:01:12/
     )
 
     const box = within(kabs).getByRole('checkbox', {
@@ -197,6 +198,8 @@ describe('Home', () => {
     fireEvent.click(box)
     expect(box).toBeChecked()
     expect(kabs).toHaveTextContent('2 open')
+    // What is ticked is no longer late.
+    expect(kabs).toHaveTextContent('2 late')
     // It stays in sight, so a slip can be undone; the count moves at once.
     expect(screen.getByRole('tab', { name: 'Open actions (10)' })).toBeVisible()
 

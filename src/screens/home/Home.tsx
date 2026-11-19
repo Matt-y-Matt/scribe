@@ -7,7 +7,7 @@ import { useApp } from '@/lib/app-state'
 import { useBackend } from '@/lib/backend'
 import { usePrefs } from '@/lib/prefs'
 import { cn } from '@/lib/utils'
-import { clock } from '../live/format'
+import { clock, wallClockMs } from '../live/format'
 import { Settings } from '../settings/Settings'
 import { MeetingPreview } from './MeetingPreview'
 import { useDoneTicks } from './open-actions'
@@ -133,7 +133,10 @@ function MeetingRow({
 export function Home({
   initialSearch = '',
   initialPane = 'meeting',
+  clockMs,
 }: {
+  /** The moment due dates are judged against; the clock's, unless given. */
+  clockMs?: number
   /** What the right side opens on: the `?screen=home-actions` fixture. */
   initialPane?: 'meeting' | 'actions'
   /** What the search box opens with: the `?screen=home-search` fixture. */
@@ -147,6 +150,8 @@ export function Home({
   const [chosen, setChosen] = useState<string | null>(null)
   const [typed, setTyped] = useState(initialSearch)
   const [pane, setPane] = useState(initialPane)
+  // One "now" for as long as Home is open, so nothing turns late mid-read.
+  const [nowMs] = useState(() => clockMs ?? wallClockMs())
   const [startFailed, setStartFailed] = useState(false)
   const ticks = useDoneTicks()
   const query = useDeferredValue(typed.trim())
@@ -428,11 +433,18 @@ export function Home({
                 open={owed.data}
                 done={ticks.done}
                 onDone={ticks.onDone}
+                nowMs={nowMs}
               />
             )
           )
         ) : (
-          selected && <MeetingPreview key={selected.id} meeting={selected} />
+          selected && (
+            <MeetingPreview
+              key={selected.id}
+              meeting={selected}
+              nowMs={nowMs}
+            />
+          )
         )}
       </section>
 

@@ -224,6 +224,14 @@ Matt asked to keep building before his real 60-minute meeting (planned for 2026-
 - **Not checked in the real app when this was committed.** The four were seen in Chromium against the fixtures (screenshots and Playwright). The Save dialog is Windows' own and has been compiled, not opened; that is the one to try first.
 - **Tests**: 334 TypeScript, 71 Rust, 40 Playwright, all passing locally. `pnpm screenshot` covers 19 states (`settings-appearance` is new).
 
+### A due date read as a date (2026-11-20, Matt: "yes start on the due date, hold H")
+- **What it does.** A due text is still kept exactly as it was said. Beside it the app now shows the day it meant, counted from the day of the meeting: `due Friday (Fri 20 Nov)`. On the day itself it says `(today)`. Past it, an action that is not done says `2 days late`.
+- **Where.** Home → Open actions (each person's actions are now in the order they fall due, undated ones last, and the person's line says how many are late); the selected meeting's preview on Home; and "From last time" in the live rail.
+- **Where not, yet.** Cards on the map, the end screen, the summary and the drafts still show the text alone. Those files were being changed by another session when this was built; the reader (`src/lib/due.ts`, `dueNote`) is ready for them.
+- **What it reads.** today, tonight, EOD, tomorrow, the day after tomorrow; a weekday, with "this" or "next"; this week, next week, early next week, end of the month, next month; "in 3 days", "two weeks", "in a month"; and dates said as dates (21 Nov, Nov 21st, 21/11, 21.11.2026, 2026-11-21, "the 21st"). A time of day or "by" in front is ignored. Anything else ("after CLA signs", "soon", "Q2") has no date: it is shown as it is and is never called late.
+- **Limits.** English only. The day counted from is the day the meeting was created, which is the day it was held unless it was set up days ahead (the preview uses the day it started). Nothing is stored: the date is worked out each time, so a change to the rules changes old meetings too. Not run in the real app; no Rust was touched, and the Rust half of `pnpm check` and `pnpm test` was not rerun for this change.
+- **Tests**: 392 TypeScript, 40 Playwright, all passing locally.
+
 ### Not verified
 - **The model-written layout, beyond one try.** Asked for "one short paragraph in plain words, then the actions as a table" on a cut of the fixture's notes, the local model answered in 42 s with a correct table and a paragraph that got a condition wrong (it wrote that the quote is 42 *if* a Q2 batch is signed; the notes say 42, or 40 if it is signed) and added dollar signs. The screen says a model wrote the text and to read it against the lists. The three built-in layouts use no model and cannot do this.
 - **Copy** in the installed app. `navigator.clipboard` was not exercised in the real window.

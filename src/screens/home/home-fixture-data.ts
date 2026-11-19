@@ -8,6 +8,8 @@ import { fixtureSegments } from '../live/fixture-session'
 const DAY = 86_400_000
 // A fixed "now", so the dates in screenshots do not change.
 const NOW = Date.UTC(2026, 10, 19, 3, 0)
+/** The moment Home's fixtures judge due dates against. */
+export const FIXTURE_NOW = NOW
 
 const meeting = (
   id: string,

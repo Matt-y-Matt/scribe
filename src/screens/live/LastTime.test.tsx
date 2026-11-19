@@ -29,7 +29,10 @@ describe('LastTime', () => {
     const rows = screen.getAllByRole('listitem')
     expect(rows).toHaveLength(3)
     expect(rows[0]).toHaveTextContent('Chase UDO for the signed PO')
-    expect(rows[0]).toHaveTextContent(/Zach · due Monday · from /)
+    // "Monday" is shown with the date it meant, and it has long passed.
+    expect(rows[0]).toHaveTextContent(
+      /Zach · due Monday \(.+\) · \d+ days late · from /
+    )
     // No due date: the line simply does not mention one.
     expect(rows[2]).toHaveTextContent(/Ant · from /)
   })

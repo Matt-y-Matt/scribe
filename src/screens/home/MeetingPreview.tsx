@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import type { CardRow, MeetingInfo } from '@/ipc'
 import { useApp } from '@/lib/app-state'
 import { useBackend } from '@/lib/backend'
+import { dueNote, lateText } from '@/lib/due'
 import { OwnerChip } from '../live/CardRow'
 import { clock } from '../live/format'
 import { KindIcon } from '../live/KindIcon'
@@ -52,15 +53,21 @@ function Group({
 function Row({
   card,
   topic,
+  saidOnMs,
+  nowMs,
   onOpen,
 }: {
   card: CardRow
   topic: string
+  /** The day of the meeting: what "Friday" is counted from. */
+  saidOnMs: number
+  nowMs: number
   onOpen: (atMs: number) => void
 }) {
-  const meta = [topic, card.owner, card.due_text && `due ${card.due_text}`]
-    .filter(Boolean)
-    .join(' · ')
+  const due = dueNote(card.due_text, saidOnMs, nowMs)
+  // What is done is not late, whenever it was due.
+  const lateDays = card.done_at_ms === null ? (due?.lateDays ?? 0) : 0
+  const meta = [topic, card.owner, due?.label].filter(Boolean).join(' · ')
   return (
     <li className="flex items-start gap-2 border-b px-2 py-1.5 last:border-b-0">
       <KindIcon kind={card.kind} className="mt-[3px]" />
@@ -76,6 +83,14 @@ function Row({
             {clock(card.created_t_ms)}
           </button>
           {meta && ` · ${meta}`}
+          {lateDays > 0 && (
+            <>
+              {' · '}
+              <span className="font-semibold whitespace-nowrap text-action">
+                {lateText(lateDays)}
+              </span>
+            </>
+          )}
         </p>
       </div>
       {card.kind === 'action' && card.owner && <OwnerChip name={card.owner} />}
@@ -83,7 +98,14 @@ function Row({
   )
 }
 
-export function MeetingPreview({ meeting }: { meeting: MeetingInfo }) {
+export function MeetingPreview({
+  meeting,
+  nowMs,
+}: {
+  meeting: MeetingInfo
+  /** The moment "late" is judged against. */
+  nowMs: number
+}) {
   const backend = useBackend()
   const go = useApp(app => app.go)
   const openSheet = useApp(app => app.open)
@@ -99,6 +121,7 @@ export function MeetingPreview({ meeting }: { meeting: MeetingInfo }) {
   const open = (atMs?: number) =>
     go({ name: 'meeting', meetingId: meeting.id, atMs })
   const outline = map.data ? outlineOf(map.data) : null
+  const saidOnMs = meeting.started_at_ms ?? meeting.created_at_ms
 
   return (
     <div className="mx-auto flex max-w-[720px] flex-col gap-4 p-6">
@@ -180,6 +203,8 @@ export function MeetingPreview({ meeting }: { meeting: MeetingInfo }) {
                 key={card.id}
                 card={card}
                 topic={outline.topicTitle(card.topic_id)}
+                saidOnMs={saidOnMs}
+                nowMs={nowMs}
                 onOpen={open}
               />
             ))}
@@ -194,6 +219,8 @@ export function MeetingPreview({ meeting }: { meeting: MeetingInfo }) {
                 key={card.id}
                 card={card}
                 topic={outline.topicTitle(card.topic_id)}
+                saidOnMs={saidOnMs}
+                nowMs={nowMs}
                 onOpen={open}
               />
             ))}

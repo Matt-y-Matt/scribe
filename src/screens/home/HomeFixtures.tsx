@@ -11,6 +11,7 @@ import { Settings } from '../settings/Settings'
 import { Home } from './Home'
 import {
   FIXTURE_MEETINGS,
+  FIXTURE_NOW,
   fixtureMaps,
   fixtureTranscripts,
   PREMEETING_DRAFT,
@@ -48,7 +49,11 @@ function fixtureHome(
       <QueryClientProvider client={client}>
         <BackendContext value={backend}>
           <div className="relative h-full">
-            <Home initialSearch={search} initialPane={pane} />
+            <Home
+              initialSearch={search}
+              initialPane={pane}
+              clockMs={FIXTURE_NOW}
+            />
             {sheet?.name === 'premeeting' && (
               <PreMeeting
                 initial={PREMEETING_DRAFT}

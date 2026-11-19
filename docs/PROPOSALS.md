@@ -58,7 +58,7 @@ The test for every item: does it get an action out of the room with an owner and
 - **"+" on the agenda chips** to add a header mid-meeting (UI_SPEC §2.1). Built 2026-11-19.
 - **Remove a highlight** from the timeline. Built 2026-11-19.
 - **Theme switch in Settings** (light, dark, as Windows). Built 2026-11-19.
-- **A due date that is a date.** "Friday" is kept as text. Showing "Fri 21 Nov" next to it, worked out from the meeting's day, would let Open actions sort by date and show what is late. Text stays the truth; the date is a reading of it.
+- **A due date that is a date.** Built 2026-11-20 for Home and the "From last time" rail, see NOTES; the map and the end screen wait. "Friday" is kept as text. Showing "Fri 21 Nov" next to it, worked out from the meeting's day, would let Open actions sort by date and show what is late. Text stays the truth; the date is a reading of it.
 - **Speaker name on a transcript line**: click `Room` on a line to say who it was; later lines stay `Room`. Useful only until phones do it properly (M4), so low.
 
 ## 4. Looks
