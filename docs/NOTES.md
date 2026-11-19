@@ -233,10 +233,22 @@ Matt asked to keep building before his real 60-minute meeting (planned for 2026-
 - **Not checked in the real app when this was committed.** The four were seen in Chromium against the fixtures (screenshots and Playwright). The Save dialog is Windows' own and has been compiled, not opened; that is the one to try first.
 - **Tests**: 334 TypeScript, 71 Rust, 40 Playwright, all passing locally. `pnpm screenshot` covers 19 states (`settings-appearance` is new).
 
+### The cards on the live board, restyled (2026-11-20)
+Matt, after the due dates on Home: "this is not during meeting and the cards that come up", and "can we improve the uiux and the design because right now it sucks". What he listed beside that (new topics opening side by side, a colour for pinned and off-agenda, the zoom that emptied every topic, the note-taker and its models) was already built by the other session in `2741fe3` and `4bd6a2b`; this is the look of the board itself.
+- **What was wrong.** Every card was the same grey row: a 3 px bar, a line of text, and a line of mono time under each one. Sixty cards were sixty identical rows and a hundred and twenty lines; what was decided and what was owed did not stand out from what was merely said.
+- **Decisions and actions are filled blocks; notes are plain text.** A decision is a blue block in semibold. An action is a warm block with its owner chip, and under it who and by when. A note has no fill and no second line. A quote and a research card keep their own tints.
+- **The time is on the card's corner when it is pointed at or focused**, with the pencil, not on every row. A click on a card still plays it from there.
+- **A due date on a card is read as a date**, as on Home: `Kabs · due tomorrow (Wed, Nov 18)`, and `1 day late` when a finished meeting is read after the date. The day counted from is the day the meeting started (`LiveMeeting` asks the core for it).
+- **The board has a whiteboard's dots**, and Tidy, Fit and zoom sit on a solid strip so cards no longer show through them.
+- **The `silent | speaking` control is gone from the status strip** until the scribe exists (M3): it did nothing.
+- **Not changed:** the layout, widths and zoom (the other session's board work stands), the rail, the transcript, the timeline, Home, the end screen. The same look has not been carried to the end screen's lists.
+- **Checked:** `live`, `live-ghost`, `live-unplanned` and `review` in Chromium, light and dark. Not run in the real app. No Rust touched; the Rust half of check and test was not rerun.
+- **Tests**: 393 TypeScript, 40 Playwright, all passing locally.
+
 ### A due date read as a date (2026-11-20, Matt: "yes start on the due date, hold H")
 - **What it does.** A due text is still kept exactly as it was said. Beside it the app now shows the day it meant, counted from the day of the meeting: `due Friday (Fri 20 Nov)`. On the day itself it says `(today)`. Past it, an action that is not done says `2 days late`.
 - **Where.** Home → Open actions (each person's actions are now in the order they fall due, undated ones last, and the person's line says how many are late); the selected meeting's preview on Home; and "From last time" in the live rail.
-- **Where not, yet.** Cards on the map, the end screen, the summary and the drafts still show the text alone. Those files were being changed by another session when this was built; the reader (`src/lib/due.ts`, `dueNote`) is ready for them.
+- **Where not, yet.** The end screen, the summary and the drafts still show the text alone; those files were being changed by another session. Cards on the map got it the same day (see above).
 - **What it reads.** today, tonight, EOD, tomorrow, the day after tomorrow; a weekday, with "this" or "next"; this week, next week, early next week, end of the month, next month; "in 3 days", "two weeks", "in a month"; and dates said as dates (21 Nov, Nov 21st, 21/11, 21.11.2026, 2026-11-21, "the 21st"). A time of day or "by" in front is ignored. Anything else ("after CLA signs", "soon", "Q2") has no date: it is shown as it is and is never called late.
 - **Limits.** English only. The day counted from is the day the meeting was created, which is the day it was held unless it was set up days ahead (the preview uses the day it started). Nothing is stored: the date is worked out each time, so a change to the rules changes old meetings too. Not run in the real app; no Rust was touched, and the Rust half of `pnpm check` and `pnpm test` was not rerun for this change.
 - **Tests**: 392 TypeScript, 40 Playwright, all passing locally.

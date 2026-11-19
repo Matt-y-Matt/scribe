@@ -3,11 +3,12 @@ import { Pencil } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useStore } from 'zustand'
 import type { Card } from '@/engine/model'
+import { dueNote, lateText } from '@/lib/due'
 import { cn } from '@/lib/utils'
 import { CardEditor } from './CardEditor'
 import { clock, initials } from './format'
 import { KindIcon } from './KindIcon'
-import { KIND_BAR } from './kinds'
+import { KIND_BLOCK } from './kinds'
 import { useLive } from './live-context'
 import { OwnerPicker } from './OwnerPicker'
 
@@ -37,11 +38,13 @@ export function CardFace({
   /** Stands in for the owner chip: on the map it is a control. */
   chip?: ReactNode
 }) {
-  const meta = [
-    clock(card.created_t_ms),
-    card.owner,
-    card.done_at_ms !== null ? 'done' : card.due_text && `due ${card.due_text}`,
-  ].filter(Boolean)
+  const { saidOnMs, nowMs } = useLive()
+  const done = card.done_at_ms !== null
+  const due = done ? null : dueNote(card.due_text, saidOnMs, nowMs)
+  // Who and by when: the line under an action. The time a card was made
+  // is on its corner when it is pointed at, not on every row.
+  const meta = [card.owner, done ? 'done' : due?.label].filter(Boolean)
+  const late = due?.lateDays ?? 0
   return (
     <>
       <KindIcon kind={card.kind} className="mt-[3px]" />
@@ -50,7 +53,8 @@ export function CardFace({
           <p
             className={cn(
               'min-w-0 flex-1 text-body',
-              card.done_at_ms !== null && 'text-text-muted line-through'
+              card.kind === 'decision' && 'font-semibold',
+              done && 'text-text-muted line-through'
             )}
           >
             {card.text}
@@ -60,10 +64,17 @@ export function CardFace({
               <OwnerChip name={card.owner} />
             ))}
         </div>
-        {/* The meta line runs under the chip, so it stays on one line. */}
-        <p className="font-mono text-meta text-text-muted">
-          {meta.join(' · ')}
-        </p>
+        {(meta.length > 0 || late > 0) && (
+          // Two pieces that wrap as wholes: no dot left hanging on a line.
+          <p className="flex flex-wrap gap-x-2 text-secondary text-text-muted">
+            <span>{meta.join(' · ')}</span>
+            {late > 0 && (
+              <span className="font-semibold whitespace-nowrap text-action">
+                {lateText(late)}
+              </span>
+            )}
+          </p>
+        )}
       </div>
     </>
   )
@@ -124,8 +135,7 @@ export function CardRow({ card }: { card: Card }) {
         data-card-id={card.id}
         data-kind={card.kind}
         className={cn(
-          'nodrag nopan relative flex items-start gap-2 border-b border-l-[3px] pr-2 pl-[5px] last:border-b-0',
-          KIND_BAR[card.kind]
+          'nodrag nopan relative flex items-start gap-2 rounded-md border border-accent bg-surface px-2'
         )}
       >
         <CardEditor
@@ -143,8 +153,8 @@ export function CardRow({ card }: { card: Card }) {
       data-card-id={card.id}
       data-kind={card.kind}
       className={cn(
-        'group nodrag nopan fade-in relative flex cursor-grab items-start gap-2 border-b border-l-[3px] py-1 pr-2 pl-[5px] last:border-b-0',
-        KIND_BAR[card.kind],
+        'group nodrag nopan fade-in relative flex cursor-grab items-start gap-2 rounded-md px-2 py-1.5',
+        KIND_BLOCK[card.kind],
         drag.isDragging && 'opacity-40',
         playing && 'outline outline-1 -outline-offset-1 outline-accent'
       )}
@@ -169,19 +179,25 @@ export function CardRow({ card }: { card: Card }) {
         card={card}
         chip={card.kind === 'action' ? <OwnerPicker card={card} /> : undefined}
       />
-      {/* Out of the way until the card is pointed at or focused. */}
-      <button
-        type="button"
-        aria-label="Edit card"
-        className="absolute right-1 bottom-0.5 flex size-5 items-center justify-center rounded-md bg-surface text-text-muted opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-surface-2 focus-visible:opacity-100"
-        onPointerDown={event => event.stopPropagation()}
-        onClick={event => {
-          event.stopPropagation()
-          setEditingId(card.id)
-        }}
-      >
-        <Pencil size={11} aria-hidden />
-      </button>
+      {/* When it was said, and the pencil: out of the way until the card is
+          pointed at or focused. A click anywhere on the card plays it. */}
+      <span className="absolute right-1 bottom-1 flex h-5 items-center gap-1 rounded-md border bg-surface pl-1.5 opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100">
+        <span className="font-mono text-meta text-text-muted">
+          {clock(card.created_t_ms)}
+        </span>
+        <button
+          type="button"
+          aria-label="Edit card"
+          className="flex size-5 items-center justify-center rounded-md text-text-muted hover:bg-surface-2"
+          onPointerDown={event => event.stopPropagation()}
+          onClick={event => {
+            event.stopPropagation()
+            setEditingId(card.id)
+          }}
+        >
+          <Pencil size={11} aria-hidden />
+        </button>
+      </span>
     </li>
   )
 }

@@ -10,6 +10,8 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import {
+  Background,
+  BackgroundVariant,
   MiniMap,
   Panel,
   ReactFlow,
@@ -28,7 +30,7 @@ import { addTopic, moveCard, moveTopic, pinTopic } from '@/engine/actions'
 import { headersOf, type Card, type CardKind } from '@/engine/model'
 import type { CanvasAction, CanvasState } from './canvas-state'
 import { CardFace, type DropTarget } from './CardRow'
-import { KIND_BAR } from './kinds'
+import { KIND_BLOCK } from './kinds'
 import { columnAt, TOPIC_WIDTH } from './layout'
 import { useLive } from './live-context'
 import { HeaderColumn, TopicNodeView } from './MapNodes'
@@ -335,6 +337,13 @@ function Flow({
           disableKeyboardA11y
           attributionPosition="top-right"
         >
+          {/* A whiteboard's dots: the board reads as a surface to fill. */}
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={24}
+            size={1.5}
+            color="var(--border)"
+          />
           <MiniMap
             pannable
             zoomable
@@ -345,7 +354,10 @@ function Flow({
             }
             nodeStrokeColor="transparent"
           />
-          <Panel position="bottom-left" className="flex gap-1">
+          <Panel
+            position="bottom-left"
+            className="flex gap-1 rounded-md border bg-surface p-1"
+          >
             <Button variant="outline" size="sm" onClick={tidy} title="Tidy (T)">
               Tidy
             </Button>
@@ -385,10 +397,12 @@ function Flow({
       </div>
       <DragOverlay dropAnimation={null}>
         {dragged && (
-          <div
-            className={`flex w-[258px] cursor-grabbing items-start gap-2 rounded-md border border-l-[3px] bg-surface py-1 pr-2 pl-[5px] ${KIND_BAR[dragged.kind]}`}
-          >
-            <CardFace card={dragged} />
+          <div className="w-[256px] cursor-grabbing rounded-md border bg-surface">
+            <div
+              className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${KIND_BLOCK[dragged.kind]}`}
+            >
+              <CardFace card={dragged} />
+            </div>
           </div>
         )}
       </DragOverlay>

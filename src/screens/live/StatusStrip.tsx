@@ -363,17 +363,6 @@ export function StatusStrip() {
       </nav>
 
       {!review && <Levels />}
-      <div
-        role="group"
-        aria-label="Scribe replies"
-        title="Spoken replies arrive with the scribe"
-        className="flex h-6 items-center rounded-md border text-secondary"
-      >
-        <span className="rounded-md bg-surface-2 px-2 font-semibold">
-          silent
-        </span>
-        <span className="px-2 text-text-muted">speaking</span>
-      </div>
       <span
         title="Audio and transcript stay on this PC"
         className="flex h-6 items-center rounded-md border px-2 text-secondary"

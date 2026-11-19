@@ -7,6 +7,8 @@
  * --aside and --aside-soft mark what is off the agenda and what is pinned,
  * at Matt's ask (DECISIONS, 2026-11-20): the grey of --pin did not set it
  * apart from the rest of the map.
+ * --action-soft is to --action what --accent-soft is to --accent: the fill of
+ * an action card on the map (DECISIONS, 2026-11-20).
  */
 :root {
   color-scheme: light;
@@ -21,6 +23,7 @@
   --on-accent: #ffffff;
   --record: #dc2626;
   --action: #b45309;
+  --action-soft: #fbf1e3;
   --research: #0f766e;
   --quote: #fde68a;
   --pin: #6b6b68;
@@ -41,6 +44,7 @@
   --on-accent: #141416;
   --record: #ef4444;
   --action: #f59e0b;
+  --action-soft: #2e2413;
   --research: #2dd4bf;
   --quote: #78350f;
   --pin: #9a9a96;
@@ -62,6 +66,7 @@
     --on-accent: #141416;
     --record: #ef4444;
     --action: #f59e0b;
+    --action-soft: #2e2413;
     --research: #2dd4bf;
     --quote: #78350f;
     --pin: #9a9a96;

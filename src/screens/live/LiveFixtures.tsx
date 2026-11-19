@@ -62,6 +62,13 @@ function fixtureScreen(
             session={session}
             actions={actions}
             zoom={zoom}
+            saidOnMs={Date.UTC(2026, 10, 17, 3, 0)}
+            clockMs={
+              // In review the meeting is two days old; live, it is today.
+              mode === 'review'
+                ? Date.UTC(2026, 10, 19, 3, 0)
+                : Date.UTC(2026, 10, 17, 3, 7)
+            }
           />
         </BackendContext>
       </QueryClientProvider>

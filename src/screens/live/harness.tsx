@@ -15,6 +15,9 @@ import {
   type SessionStore,
 } from './session'
 
+/** A fixed day, so a test's due dates do not move with the clock. */
+const HARNESS_DAY = new Date(2026, 10, 17, 11).getTime()
+
 /**
  * The live screen's context without the canvas, for component tests: the
  * parts under test read the map and act on it exactly as they do on screen.
@@ -27,6 +30,8 @@ export function LiveHarness({
   actions,
   onFocusHeader,
   onFocusTopic,
+  saidOnMs,
+  nowMs,
   children,
 }: {
   store: MapStore
@@ -36,6 +41,9 @@ export function LiveHarness({
   actions?: Partial<SessionActions>
   onFocusHeader?: (headerId: string) => void
   onFocusTopic?: (topicId: string) => void
+  /** The day of the meeting and the moment "late" is judged against. */
+  saidOnMs?: number
+  nowMs?: number
   children: ReactNode
 }) {
   const state = useMapState(store)
@@ -58,6 +66,8 @@ export function LiveHarness({
     actions: { ...idleActions, ...actions },
     focusHeader: headerId => onFocusHeader?.(headerId),
     focusTopic: topicId => onFocusTopic?.(topicId),
+    saidOnMs: saidOnMs ?? HARNESS_DAY,
+    nowMs: nowMs ?? saidOnMs ?? HARNESS_DAY,
     openPalette: () => undefined,
   }
   return (

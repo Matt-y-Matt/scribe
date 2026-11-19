@@ -31,6 +31,10 @@ export interface LiveContextValue {
   focusTopic: (topicId: string) => void
   /** Opens the search over the map (Ctrl+K). */
   openPalette: () => void
+  /** The day of the meeting: what "Friday" on a card is counted from. */
+  saidOnMs: number
+  /** The moment "late" is judged against. */
+  nowMs: number
 }
 
 export const LiveContext = createContext<LiveContextValue | null>(null)

@@ -17,10 +17,15 @@ const topicNamed = (state: MapState, title: string) => {
   return topic
 }
 
-function show(store: MapStore, title: string, collapsed = false) {
+function show(
+  store: MapStore,
+  title: string,
+  collapsed = false,
+  nowMs?: number
+) {
   const topic = topicNamed(store.getState(), title)
   render(
-    <LiveHarness store={store} collapsed={collapsed}>
+    <LiveHarness store={store} collapsed={collapsed} nowMs={nowMs}>
       <TopicCard topicId={topic.id} />
     </LiveHarness>
   )
@@ -52,15 +57,31 @@ describe('TopicCard', () => {
     expect(rows[1]).toHaveTextContent('Vector logo and mockups')
   })
 
-  it('gives an action its time, owner, due text and owner chip', () => {
+  it('gives an action its owner, its due text with the date it means, and its owner chip', () => {
+    // The harness holds the meeting on Tuesday 17 November 2026.
     show(fixtureStore({ pins: FIXTURE_PINS }), 'Artwork')
     const row = screen.getByText('Vector logo and mockups').closest('li')
-    expect(row).toHaveTextContent('00:01:38 · Ant · due Wednesday')
+    expect(row).toHaveTextContent(/Ant · due Wednesday \(.+\)/)
+    expect(row).not.toHaveTextContent('late')
     expect(within(row as HTMLElement).getByTitle('Ant')).toHaveTextContent('An')
+    // When it was said is on the card's corner, for whoever points at it.
+    expect(row).toHaveTextContent('00:01:38')
 
     const note = screen.getByText(/Logo came as a WhatsApp JPG/).closest('li')
     expect(note).toHaveTextContent('00:01:23')
     expect(within(note as HTMLElement).queryByTitle(/./)).toBeNull()
+  })
+
+  it('says how late an open action is when the meeting is read days after', () => {
+    // Friday: "Wednesday" was two days ago.
+    const friday = new Date(2026, 10, 20, 11).getTime()
+    show(fixtureStore({ pins: FIXTURE_PINS }), 'Artwork', false, friday)
+    const row = screen.getByText('Vector logo and mockups').closest('li')
+    expect(row).toHaveTextContent('2 days late')
+    // A note has no date and is never late.
+    expect(
+      screen.getByText(/Logo came as a WhatsApp JPG/).closest('li')
+    ).not.toHaveTextContent('late')
   })
 
   it('collapses cards to kind counts when zoomed out', () => {

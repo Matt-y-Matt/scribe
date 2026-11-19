@@ -25,13 +25,17 @@ export const KIND_ORDER: readonly CardKind[] = [
   'quote',
 ]
 
-/** The card's left bar, 3 px, in the kind's colour. */
-export const KIND_BAR: Record<CardKind, string> = {
-  note: 'border-l-border',
-  decision: 'border-l-accent',
-  action: 'border-l-action',
-  research: 'border-l-research',
-  quote: 'border-l-quote',
+/**
+ * What a card looks like on the map. What was decided and what is owed are
+ * filled blocks, so they are found at a glance; a note is plain text and
+ * stays out of their way.
+ */
+export const KIND_BLOCK: Record<CardKind, string> = {
+  note: 'hover:bg-surface-2',
+  decision: 'bg-accent-soft',
+  action: 'bg-action-soft',
+  research: 'bg-surface-2',
+  quote: 'bg-quote/45',
 }
 
 /** Open move and merge suggestions that would land in this topic. */

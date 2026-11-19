@@ -4,6 +4,7 @@ import { useStore } from 'zustand'
 import { Button } from '@/components/ui/button'
 import type { MapStore } from '@/engine/store'
 import { canvasReducer, INITIAL_CANVAS } from './canvas-state'
+import { wallClockMs } from './format'
 import {
   lastTouchedTopicId,
   LiveContext,
@@ -34,6 +35,10 @@ export interface LiveScreenProps {
   zoom?: number
   /** Drawn over everything below the status strip: the settings sheet. */
   overlay?: ReactNode
+  /** The day the meeting was held; today, for one that is running. */
+  saidOnMs?: number
+  /** The moment due dates are judged against; the clock's, unless given. */
+  clockMs?: number
 }
 
 function Banner({ alert, children }: { alert?: boolean; children: ReactNode }) {
@@ -148,6 +153,8 @@ export function LiveScreen({
   actions,
   zoom = 0.8,
   overlay,
+  saidOnMs,
+  clockMs,
 }: LiveScreenProps) {
   const state = useMapState(store)
   const [canvas, dispatch] = useReducer(canvasReducer, INITIAL_CANVAS)
@@ -158,6 +165,7 @@ export function LiveScreen({
     null
   )
   const [palette, setPalette] = useState(false)
+  const [nowMs] = useState(() => clockMs ?? wallClockMs())
   const [toast, setToast] = useState<{ id: number; message: string } | null>(
     null
   )
@@ -203,6 +211,8 @@ export function LiveScreen({
     focusTopic: nodeId =>
       setFocus(asked => ({ nodeId, ask: (asked?.ask ?? 0) + 1 })),
     openPalette: () => setPalette(true),
+    saidOnMs: saidOnMs ?? nowMs,
+    nowMs,
   }
 
   return (

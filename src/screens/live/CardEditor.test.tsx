@@ -123,9 +123,7 @@ describe('editing a card in place', () => {
     fireEvent.click(within(form).getByRole('checkbox', { name: 'Done' }))
     fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
     expect(store.getState().cards[id]?.done_at_ms).toEqual(expect.any(Number))
-    expect(rowOf('Vector logo and mockups')).toHaveTextContent(
-      '00:01:38 · Ant · done'
-    )
+    expect(rowOf('Vector logo and mockups')).toHaveTextContent('Ant · done')
 
     form = openEditor('Vector logo and mockups')
     expect(within(form).getByRole('checkbox', { name: 'Done' })).toBeChecked()

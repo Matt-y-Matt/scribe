@@ -148,7 +148,7 @@ export function TopicCard({ topicId }: { topicId: string }) {
           </GhostFrame>
         </div>
       ) : (
-        <header className="flex h-9 items-center gap-2 border-b pr-1 pl-2">
+        <header className="flex h-9 items-center gap-2 pr-1 pl-3">
           {renaming ? (
             <TitleInput topic={topic} onDone={() => setRenaming(false)} />
           ) : (
@@ -173,12 +173,17 @@ export function TopicCard({ topicId }: { topicId: string }) {
       {collapsed && !adding ? (
         <KindCounts cards={cards} />
       ) : (
-        <ul className={cn(pinGhost && 'border-t', 'min-h-2')}>
+        <ul
+          className={cn(
+            'flex min-h-2 flex-col gap-0.5 px-1 pb-1',
+            pinGhost && 'pt-1'
+          )}
+        >
           {cards.map(card => (
             <CardRow key={card.id} card={card} />
           ))}
           {adding && (
-            <li className="nodrag nopan flex border-l-[3px] border-l-border pr-2 pl-[5px]">
+            <li className="nodrag nopan flex rounded-md border border-accent bg-surface px-2">
               <CardEditor
                 key={addingKind}
                 topicId={topic.id}

@@ -73,7 +73,7 @@ export function estimateHeight(state: MapState, topic: Topic): number {
       (payload.kind === 'move' && payload.to_topic_id === topic.id) ||
       (payload.kind === 'merge' && payload.into_topic_id === topic.id)
   ).length
-  return 37 + cardsIn(state, topic.id).length * 56 + Math.min(ghosts, 3) * 60
+  return 40 + cardsIn(state, topic.id).length * 46 + Math.min(ghosts, 3) * 60
 }
 
 /** Columns that are drawn: the agenda, and Unplanned when it is in use. */

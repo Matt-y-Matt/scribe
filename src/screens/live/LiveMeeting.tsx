@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useApp } from '@/lib/app-state'
 import { reasonOf, useBackend } from '@/lib/backend'
@@ -23,6 +24,11 @@ export function LiveMeeting({
   const { sheet, open: openSheet, close, go } = useApp()
   const [running, setRunning] = useState<RunningMeeting | null>(null)
   const [failed, setFailed] = useState(false)
+  // The day it was held: what "Friday" on a card is counted from.
+  const meeting = useQuery({
+    queryKey: ['meeting', meetingId],
+    queryFn: () => backend.getMeeting(meetingId),
+  })
 
   useEffect(() => {
     let gone = false
@@ -85,6 +91,7 @@ export function LiveMeeting({
       store={running.store}
       session={running.session}
       actions={running.actions}
+      saidOnMs={meeting.data?.started_at_ms ?? meeting.data?.created_at_ms}
       overlay={
         sheet?.name === 'settings' && (
           <Settings
