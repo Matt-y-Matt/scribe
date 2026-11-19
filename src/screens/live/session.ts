@@ -48,6 +48,8 @@ export interface SessionState {
   lastTime: readonly OpenAction[]
   /** The ones of those ticked done since this meeting was opened. */
   lastTimeDone: readonly string[]
+  /** The notes of a finished meeting being written again: lines read so far. */
+  rebuilding: { done: number; of: number } | null
 }
 
 export interface SessionActions {
@@ -74,6 +76,11 @@ export interface SessionActions {
   showMap(): void
   /** Back to Home. */
   leave(): void
+  /**
+   * A finished meeting: take out the notes the model made and have it read
+   * the transcript again, with the note-taker as it is now.
+   */
+  rebuild(): void
 }
 
 export type SessionStore = StoreApi<SessionState>
@@ -101,6 +108,7 @@ export const emptySession = (
   highlights: [],
   lastTime: [],
   lastTimeDone: [],
+  rebuilding: null,
 })
 
 export function createSessionStore(initial: SessionState): SessionStore {
@@ -151,4 +159,5 @@ export const idleActions: SessionActions = {
   wrapUp: noop,
   showMap: noop,
   leave: noop,
+  rebuild: noop,
 }

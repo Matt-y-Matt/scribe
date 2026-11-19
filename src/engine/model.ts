@@ -127,6 +127,7 @@ export const OP_TYPES = [
   'unpin_topic',
   'revisit_topic',
   'schedule_topic',
+  'clear_notes',
 ] as const
 export type OpType = (typeof OP_TYPES)[number]
 
@@ -162,6 +163,11 @@ export function headersOf(state: MapState): Topic[] {
 
 export function unplannedHeader(state: MapState): Topic | undefined {
   return headersOf(state).find(header => header.off_agenda)
+}
+
+/** The meeting has an agenda, so there is such a thing as off it. */
+export function hasAgenda(state: MapState): boolean {
+  return headersOf(state).some(header => !header.off_agenda)
 }
 
 export function topicsUnder(state: MapState, headerId: string): Topic[] {

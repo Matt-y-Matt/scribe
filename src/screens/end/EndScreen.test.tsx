@@ -299,10 +299,11 @@ describe('EndScreen', () => {
         'The team priced the CLA order and split the supplier work.'
       )
     )
-    // The transcript went to the model as turns, a stretch at a time.
+    // The transcript went to the larger model as turns, a stretch at a time.
     expect(ollamaChat.mock.calls[0]?.[0]).toContain(
       'TRANSCRIPT OF THIS STRETCH'
     )
+    expect(ollamaChat.mock.calls[0]?.[0]).toContain('"model":"qwen3.5:9b"')
     expect(text.value).toContain('## Discussed\n\n### CLA quote')
     // What is ticked leads the lists; what the reading found is added once.
     expect(text.value).toContain('- **Kabs**: Call Ross')
@@ -328,6 +329,25 @@ describe('EndScreen', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Written' }))
     await waitFor(() => expect(text.value).toContain('## Discussed'))
     expect(ollamaChat.mock.calls.length).toBeGreaterThan(calls)
+  })
+
+  it('falls back to the note-taker’s model when the larger one is not pulled', async () => {
+    const read = reader()
+    const ollamaChat = vi.fn(async (body: string) => {
+      if (body.includes('"model":"qwen3.5:9b"')) {
+        throw new BackendError({ kind: 'local_ai', detail: 'model not found' })
+      }
+      return read(body)
+    })
+    show({ backend: { ollamaChat } })
+    const text = await summaryText()
+    await waitFor(() => expect(text.value).toContain('## Discussed'))
+    expect(
+      ollamaChat.mock.calls.some(([body]) =>
+        body.includes('"model":"qwen3.5:4b"')
+      )
+    ).toBe(true)
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('leaves the list of what is ticked, and says why, when no model answers', async () => {

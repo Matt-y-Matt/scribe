@@ -54,7 +54,15 @@ export interface WrittenSummary {
 /** Words of transcript in one stretch: about five minutes of talk. */
 export const STRETCH_WORDS = 700
 const REPLY_TOKENS = 2_000
-const TIMEOUT_MS = 180_000
+/** The 9B model, part of it on the CPU, took up to two minutes a request. */
+const TIMEOUT_MS = 600_000
+/**
+ * The summary's model. It runs once, after the meeting, so it can be the
+ * larger one: on the Edwin call the 9B kept the dates and decisions the 4B
+ * got wrong, at about 8 minutes for 31 minutes of talk (docs/NOTES.md,
+ * 2026-11-20). Where it is not pulled, the live note-taker's model writes it.
+ */
+export const SUMMARY_MODEL = 'qwen3.5:9b'
 /** More open questions than this is a list nobody reads. */
 const MAX_OPEN = 5
 /** Two lines sharing this share of their words say the same thing. */

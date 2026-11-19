@@ -8,6 +8,7 @@ import type {
   RecordingState,
   SegmentFinal,
 } from '@/ipc'
+import { addCard, addTopic } from '@/engine/actions'
 import { BackendError, type Backend } from '@/lib/backend'
 import { fixtureBackend, FIXTURE_MODELS } from '@/lib/fixture-backend'
 import { DEFAULT_PREFS, usePrefs } from '@/lib/prefs'
@@ -339,6 +340,103 @@ describe('openMeeting', () => {
     })
     expect(running.session.getState().segments).toHaveLength(2)
     expect(running.session.getState().highlights).toHaveLength(1)
+  })
+
+  it('writes a finished meeting’s notes again, keeping what the host added', async () => {
+    const asked: string[] = []
+    // A model that notes every turn it is shown under one topic.
+    const ollamaChat = vi.fn(async (body: string) => {
+      const sent = JSON.parse(body) as {
+        format: {
+          properties: {
+            segments: { items: { properties: { id: { enum: string[] } } } }
+          }
+        }
+        messages: { content: string }[]
+      }
+      asked.push(sent.messages[1]?.content ?? '')
+      const ids = sent.format.properties.segments.items.properties.id.enum
+      const reply = {
+        segments: ids.map(id => ({
+          id,
+          type: 'new',
+          header: 'OFF',
+          topic: 'Launch',
+          cards: [
+            { kind: 'note', owner: null, due_text: null, text: `From ${id}` },
+          ],
+        })),
+      }
+      return JSON.stringify({ message: { content: JSON.stringify(reply) } })
+    })
+    const words = (n: number) =>
+      Array.from({ length: 30 }, (_, k) => `w${n}x${k}`).join(' ')
+    const { backend } = core(
+      meeting({
+        agenda: [],
+        participants: ['Matt', 'Zach'],
+        loopback: true,
+        started_at_ms: 1,
+        ended_at_ms: 2,
+        duration_ms: 90_000,
+      }),
+      {
+        ollamaChat,
+        getSegments: async () => [
+          segment('s_1', 0, words(1)),
+          segment('s_2', 10_000, words(2)),
+          { ...segment('s_3', 20_000, words(3)), source: 'system' },
+        ],
+      }
+    )
+    const running = await open(backend, false)
+    const { store, actions, session } = running
+    // What the old note-taker left, and a card the host wrote.
+    const header = Object.values(store.getState().topics)[0]
+    const old = addTopic(store, header?.id ?? '', 'Old topic')
+    const mine = addTopic(store, header?.id ?? '', 'Mine')
+    store.commit('add_card', 'engine', [
+      {
+        entity: 'card',
+        id: 'c_old',
+        before: null,
+        after: {
+          id: 'c_old',
+          meeting_id: 'm_1',
+          topic_id: old?.id ?? '',
+          kind: 'note',
+          text: 'Garbled',
+          owner: null,
+          due_text: null,
+          segment_ids: ['s_1'],
+          status: 'accepted',
+          source: 'engine',
+          created_t_ms: 0,
+          confirmed: false,
+          done_at_ms: null,
+          order_key: 0,
+        },
+      },
+    ])
+    addCard(store, mine?.id ?? '', { kind: 'action', text: 'Book the room' })
+
+    actions.rebuild()
+    expect(session.getState().rebuilding).toMatchObject({ of: 3 })
+    await vi.waitFor(() => expect(session.getState().rebuilding).toBeNull())
+
+    const cards = Object.values(store.getState().cards)
+    expect(cards.find(card => card.id === 'c_old')).toBeUndefined()
+    expect(cards.some(card => card.text === 'Book the room')).toBe(true)
+    expect(
+      cards.filter(card => card.text.startsWith('From '))
+    ).not.toHaveLength(0)
+    const titles = Object.values(store.getState().topics).map(t => t.title)
+    expect(titles).not.toContain('Old topic')
+    expect(titles).toContain('Mine')
+    // Read with names, and as a live transcript.
+    expect(asked.join('\n')).toContain('Matt: w1x0')
+    expect(asked.join('\n')).toContain('Zach: w3x0')
+    expect(asked.join('\n')).toContain('THIS IS A LIVE TRANSCRIPT')
   })
 
   it('saves a highlight and plays through the core', async () => {

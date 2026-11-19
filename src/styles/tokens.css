@@ -4,6 +4,9 @@
  * forces it with <html data-theme="dark">; data-theme="light" forces light.
  * --on-accent (text on an accent fill) is the one addition to the spec table:
  * white on the dark accent is 3.08:1, below AA (see docs/DECISIONS.md).
+ * --aside and --aside-soft mark what is off the agenda and what is pinned,
+ * at Matt's ask (DECISIONS, 2026-11-20): the grey of --pin did not set it
+ * apart from the rest of the map.
  */
 :root {
   color-scheme: light;
@@ -21,6 +24,8 @@
   --research: #0f766e;
   --quote: #fde68a;
   --pin: #6b6b68;
+  --aside: #7a6bc4;
+  --aside-soft: #f4f1fb;
 }
 
 :root[data-theme='dark'] {
@@ -39,6 +44,8 @@
   --research: #2dd4bf;
   --quote: #78350f;
   --pin: #9a9a96;
+  --aside: #a89cf0;
+  --aside-soft: #231f33;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -58,5 +65,7 @@
     --research: #2dd4bf;
     --quote: #78350f;
     --pin: #9a9a96;
+    --aside: #a89cf0;
+    --aside-soft: #231f33;
   }
 }

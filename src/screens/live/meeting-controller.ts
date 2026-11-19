@@ -1,4 +1,5 @@
 import { ulid } from 'ulid'
+import { clearNotes } from '@/engine/actions'
 import { RowAdapter } from '@/engine/persist'
 import cardsPrompt from '@/engine/prompts/structurer-cards.md?raw'
 import { createOllamaProvider } from '@/engine/providers/ollama'
@@ -108,33 +109,59 @@ export async function openMeeting(
 
   // The structurer builds the map from what is said, on the Ollama of this
   // PC. Its requests go through the core (backend.ollamaChat).
-  const structurer = new Structurer({
-    store,
-    provider: createOllamaProvider(
-      { kind: 'ollama', prompt: cardsPrompt },
-      body => backend.ollamaChat(body)
-    ),
-    // What it reads is speech recognition, not a written transcript.
-    liveSpeech: true,
-    log: (message, context) => logger.info(message, context),
-    // A run that failed keeps its lines for the next one, so the map
-    // catches up by itself; until then the host is told it is behind.
-    onRun: run => session.setState({ notesOff: run.error !== undefined }),
-  })
+  const noteTaker = () =>
+    new Structurer({
+      store,
+      provider: createOllamaProvider(
+        { kind: 'ollama', prompt: cardsPrompt },
+        body => backend.ollamaChat(body)
+      ),
+      // What it reads is speech recognition, not a written transcript.
+      liveSpeech: true,
+      log: (message, context) => logger.info(message, context),
+      // A run that failed keeps its lines for the next one, so the map
+      // catches up by itself; until then the host is told it is behind.
+      onRun: run => session.setState({ notesOff: run.error !== undefined }),
+    })
+  const structurer = noteTaker()
+
+  // The note-taker reads a name where the meeting's own facts give one
+  // ("Room" cannot own an action); the transcript keeps the core's label.
+  const withName = (segment: SegmentFinal) =>
+    named(
+      segment,
+      speakerNames(meeting.participants, session.getState().loopback)
+    )
 
   const mine = (id: string | null) => id === meetingId
   const heard = (segment: SegmentFinal) => {
     session.setState(state => ({
       segments: withSegment(state.segments, segment),
     }))
-    // The note-taker reads a name where the meeting's own facts give one
-    // ("Room" cannot own an action); the transcript keeps the core's label.
-    structurer.segmentFinal(
-      named(
-        segment,
-        speakerNames(meeting.participants, session.getState().loopback)
-      )
-    )
+    structurer.segmentFinal(withName(segment))
+  }
+
+  // A finished meeting's notes, written again by the note-taker as it is
+  // now. The transcript is played in at the pace a live meeting would give
+  // it: each run gets one trigger's lines and the next waits for it.
+  const rebuild = async () => {
+    const now = session.getState()
+    if (now.rebuilding || !now.review || now.segments.length === 0) return
+    const lines = [...now.segments]
+    clearNotes(store)
+    const fresh = noteTaker()
+    session.setState({ rebuilding: { done: 0, of: lines.length } })
+    try {
+      for (const [index, segment] of lines.entries()) {
+        fresh.segmentFinal(withName(segment))
+        await fresh.idle()
+        session.setState({ rebuilding: { done: index + 1, of: lines.length } })
+      }
+      fresh.end()
+      await fresh.idle()
+    } finally {
+      session.setState({ rebuilding: null })
+    }
   }
 
   const stops = [
@@ -259,6 +286,13 @@ export async function openMeeting(
       session.setState({ view: 'wrap' })
     },
     showMap: () => session.setState({ view: 'map' }),
+    rebuild: () => {
+      rebuild().catch((error: unknown) =>
+        logger.error('the notes could not be rebuilt', {
+          reason: reasonOf(error),
+        })
+      )
+    },
     leave: () => {
       quietly(backend.stopPlayback(), 'stop failed')
       leave()

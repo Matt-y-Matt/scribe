@@ -1,8 +1,13 @@
 // @vitest-environment node
 import { NodeChangeset } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
-import { addCard, moveTopic } from '@/engine/actions'
-import { headersOf, topicsUnder, type MapState } from '@/engine/model'
+import { addCard, addTopic, moveTopic } from '@/engine/actions'
+import {
+  headersOf,
+  topicsUnder,
+  unplannedHeader,
+  type MapState,
+} from '@/engine/model'
 import { canvasReducer, INITIAL_CANVAS, type CanvasState } from './canvas-state'
 import { FIXTURE_PINS, fixtureStore } from './fixture'
 import { clock, initials } from './format'
@@ -14,6 +19,7 @@ import {
   columnAt,
   layoutMap,
   TOPIC_GAP,
+  TOPIC_WIDTH,
   visibleHeaders,
 } from './layout'
 import { buildNodes, type MapNode } from './nodes'
@@ -127,6 +133,47 @@ describe('layoutMap', () => {
     })
     // The column still reaches round the topic that was dragged down.
     expect(columns[0]?.height).toBe(900 + 100 + COLUMN_PADDING)
+  })
+
+  it('lays topics off the agenda side by side, each a column of its own', () => {
+    const heights = heightsFor(state, { 'Office aircon': 240 })
+    const { topics, columns } = layoutMap(state, heights, {})
+    const unplanned = columns.at(-1)
+    const off = topicsUnder(state, unplanned?.id ?? '')
+    expect(off.length).toBeGreaterThan(1)
+    const boxes = off.map(topic => topics.find(box => box.id === topic.id))
+    expect(boxes.map(box => [box?.x, box?.y])).toEqual(
+      off.map((_, index) => [
+        COLUMN_PADDING + index * (TOPIC_WIDTH + COLUMN_GAP),
+        COLUMN_HEADER,
+      ])
+    )
+    // The area is as wide as its topics and as tall as the tallest.
+    expect(unplanned?.width).toBe(
+      COLUMN_PADDING * 2 +
+        off.length * TOPIC_WIDTH +
+        (off.length - 1) * COLUMN_GAP
+    )
+    expect(unplanned?.height).toBe(COLUMN_HEADER + 240 + COLUMN_PADDING)
+  })
+
+  it('opens a new topic off the agenda to the right, moving nothing', () => {
+    const store = fixtureStore({ pins: FIXTURE_PINS })
+    const before = layoutMap(store.getState(), heightsFor(store.getState()), {})
+    const unplanned = unplannedHeader(store.getState())
+    addTopic(store, unplanned?.id ?? '', 'Office move')
+    const after = layoutMap(store.getState(), heightsFor(store.getState()), {})
+    for (const box of before.topics) {
+      expect(after.topics.find(other => other.id === box.id)).toMatchObject({
+        x: box.x,
+        y: box.y,
+      })
+    }
+    const added = topicNamed(store.getState(), 'Office move')
+    const last = before.topics.filter(box => box.headerId === unplanned?.id)
+    expect(after.topics.find(box => box.id === added.id)?.x).toBe(
+      Math.max(...last.map(box => box.x)) + TOPIC_WIDTH + COLUMN_GAP
+    )
   })
 
   it('finds the column under a point', () => {

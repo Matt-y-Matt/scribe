@@ -78,11 +78,11 @@ function PinMarker({ topic }: { topic: Topic }) {
     <div
       data-topic-id={topic.id}
       data-pinned
-      className="flex h-8 w-[264px] items-center gap-2 rounded-md border border-dashed border-pin px-2 text-secondary text-text-muted"
+      className="flex h-8 w-[264px] items-center gap-2 rounded-md border border-dashed border-aside bg-aside-soft px-2 text-secondary"
     >
-      <Pin size={12} aria-hidden className="shrink-0" />
+      <Pin size={12} aria-hidden className="shrink-0 text-aside" />
       <span className="min-w-0 flex-1 truncate">{topic.title}</span>
-      <span className="text-meta">pinned</span>
+      <span className="text-meta text-aside">pinned</span>
     </div>
   )
 }
@@ -128,7 +128,7 @@ export function TopicCard({ topicId }: { topicId: string }) {
       onClick={() => setActiveTopicId(topic.id)}
       className={cn(
         FRAME,
-        pinGhost && 'border-dashed border-pin',
+        pinGhost && 'border-dashed border-aside',
         // A ghost stays grey until it is answered, even when it is active.
         ((active && !pinGhost) || isOver) && 'border-accent'
       )}

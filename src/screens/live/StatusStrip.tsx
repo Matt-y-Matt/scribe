@@ -220,6 +220,55 @@ function AddHeader() {
   )
 }
 
+/**
+ * A finished meeting's notes, written again from its transcript. It replaces
+ * what the model wrote, so it asks first, in place.
+ */
+function Rebuild() {
+  const { session, actions } = useLive()
+  const rebuilding = useStore(session, store => store.rebuilding)
+  const lines = useStore(session, store => store.segments.length)
+  const [asking, setAsking] = useState(false)
+
+  if (rebuilding) {
+    return (
+      <span role="status" className="text-secondary text-text-muted">
+        Writing the notes again: line {rebuilding.done} of {rebuilding.of}
+      </span>
+    )
+  }
+  if (asking) {
+    return (
+      <span className="flex items-center gap-2 text-secondary">
+        Replace the notes the model wrote? Cards you added stay.
+        <Button
+          size="sm"
+          onClick={() => {
+            setAsking(false)
+            actions.rebuild()
+          }}
+        >
+          Rebuild
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setAsking(false)}>
+          Cancel
+        </Button>
+      </span>
+    )
+  }
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={lines === 0}
+      title="Have the model on this PC write this meeting's notes again from the transcript"
+      onClick={() => setAsking(true)}
+    >
+      Rebuild notes
+    </Button>
+  )
+}
+
 export function StatusStrip() {
   const { session, actions, state, focusHeader, openPalette } = useLive()
   const rec = useStore(session, store => store.rec)
@@ -248,6 +297,7 @@ export function StatusStrip() {
           Summary
         </Button>
       )}
+      {review && <Rebuild />}
 
       <nav
         aria-label="Agenda"

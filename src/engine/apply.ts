@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
   cardsIn,
-  headersOf,
+  hasAgenda,
   topicsUnder,
   unplannedHeader,
   type Card,
@@ -393,8 +393,7 @@ export function applyOps(
   // §3.2). The model's own, if it sent one, was applied above and wins.
   // A meeting with no agenda has nothing to be off: every topic would ask to
   // be pinned, so none does.
-  const hasAgenda = headersOf(state()).some(header => !header.off_agenda)
-  for (const topic of hasAgenda ? createdOffAgenda : []) {
+  for (const topic of hasAgenda(state()) ? createdOffAgenda : []) {
     const suggested = alreadySuggested(
       payload => payload.kind === 'pin' && payload.topic_id === topic.id
     )

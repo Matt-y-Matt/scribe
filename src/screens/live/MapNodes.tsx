@@ -1,4 +1,5 @@
 import type { NodeProps } from '@xyflow/react'
+import { hasAgenda } from '@/engine/model'
 import { cn } from '@/lib/utils'
 import { useLive } from './live-context'
 import type { HeaderNode, TopicNode } from './nodes'
@@ -12,22 +13,29 @@ export function HeaderColumn({ data }: NodeProps<HeaderNode>) {
   const { state } = useLive()
   const header = state.topics[data.headerId]
   if (!header) return null
+  // With no agenda nothing is off it: the area is just the meeting's topics.
+  const aside = header.off_agenda && hasAgenda(state)
   return (
     <div
       data-header-id={header.id}
+      data-aside={aside || undefined}
       className={cn(
         'h-full w-full rounded-md',
-        // Unplanned is the dashed column at the far right (UI_SPEC §2.2).
-        header.off_agenda && 'border border-dashed border-pin'
+        // Off the agenda: its own colour, at the far right (UI_SPEC §2.2).
+        aside && 'border border-dashed border-aside bg-aside-soft'
       )}
     >
       <h2
         className={cn(
           'flex h-9 items-center px-2 text-header font-semibold',
-          header.off_agenda && 'text-text-muted'
+          aside && 'text-aside'
         )}
       >
-        {header.title}
+        {header.off_agenda
+          ? aside
+            ? 'Off the agenda'
+            : 'Topics'
+          : header.title}
       </h2>
     </div>
   )

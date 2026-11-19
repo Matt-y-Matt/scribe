@@ -41,8 +41,14 @@ import { holdTyping } from './type-ahead'
 
 export const MIN_ZOOM = 0.4
 export const MAX_ZOOM = 1.5
-/** Below this, cards collapse to kind icons with counts. */
-export const COLLAPSE_ZOOM = 0.7
+/**
+ * Below this, cards collapse to kind icons with counts. It was 0.7, one
+ * wheel notch under the 0.8 the map opens at, so a single scroll emptied
+ * every topic (Matt, 2026-11-20). Text at 0.5 is about 6 px: past reading.
+ */
+export const COLLAPSE_ZOOM = 0.5
+/** A collapsed topic that is clicked is brought up at this zoom. */
+const READ_ZOOM = 0.9
 
 /** Room for the new-card box under a topic, in map pixels. */
 const EDITOR_HEIGHT = 190
@@ -84,7 +90,8 @@ function Flow({
   onZoom,
   focus,
 }: MapCanvasProps) {
-  const { store, state, tidy, activeTopicId, setEditingId } = useLive()
+  const { store, state, tidy, activeTopicId, setEditingId, collapsed } =
+    useLive()
   const flow = useReactFlow<MapNode>()
   const wrapper = useRef<HTMLDivElement>(null)
   const [dragged, setDragged] = useState<Card | null>(null)
@@ -253,6 +260,24 @@ function Flow({
     }
   }
 
+  // Zoomed out, a topic shows only its counts. A click on it is the host
+  // asking to read it, so the map goes there (rule 4.2): its top near the top
+  // of the map, centred across, at a zoom where the cards can be read.
+  const readTopic = (topicId: string) => {
+    const node = flow.getInternalNode(topicId)
+    const frame = wrapper.current?.getBoundingClientRect()
+    if (!node || !frame) return
+    const at = node.internals.positionAbsolute
+    void flow.setViewport(
+      {
+        x: frame.width / 2 - (at.x + TOPIC_WIDTH / 2) * READ_ZOOM,
+        y: 56 - at.y * READ_ZOOM,
+        zoom: READ_ZOOM,
+      },
+      { duration: 0 }
+    )
+  }
+
   const onDragStart = (event: DragStartEvent) =>
     setDragged(store.getState().cards[String(event.active.id)] ?? null)
 
@@ -295,6 +320,9 @@ function Flow({
           nodeTypes={NODE_TYPES}
           onNodesChange={onNodesChange}
           onNodeDragStop={onNodeDragStop}
+          onNodeClick={(_event, node) => {
+            if (collapsed && node.type === 'topic') readTopic(node.id)
+          }}
           defaultViewport={initialViewport}
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}

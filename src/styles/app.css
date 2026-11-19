@@ -24,6 +24,8 @@
   --color-research: var(--research);
   --color-quote: var(--quote);
   --color-pin: var(--pin);
+  --color-aside: var(--aside);
+  --color-aside-soft: var(--aside-soft);
 
   --font-*: initial;
   --font-sans: 'Inter Variable', 'Segoe UI', system-ui, sans-serif;

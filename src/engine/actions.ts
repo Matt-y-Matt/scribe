@@ -478,6 +478,55 @@ export function deleteTopic(
   ])
 }
 
+/**
+ * Takes out what the note-taker made, so a meeting that is over can be read
+ * again: every card it wrote, every suggestion, and every topic left with
+ * nothing in it. Cards a person or the scribe added stay, with their topics.
+ * A card the note-taker wrote and the host then edited goes too: cards do
+ * not record who last touched them. One step, undoable.
+ */
+export function clearNotes(
+  store: MapStore,
+  source: Exclude<Source, 'engine'> = 'user'
+): LogEntry | null {
+  const state = store.getState()
+  const gone = Object.values(state.cards).filter(
+    card => card.source === 'engine'
+  )
+  const goneIds = new Set(gone.map(card => card.id))
+  const kept = new Set(
+    Object.values(state.cards)
+      .filter(card => !goneIds.has(card.id))
+      .map(card => card.topic_id)
+  )
+  const topics = Object.values(state.topics).filter(
+    topic => topic.kind === 'topic' && !kept.has(topic.id)
+  )
+  const changes: Change[] = [
+    ...Object.values(state.suggestions).map((suggestion): Change => ({
+      entity: 'suggestion',
+      id: suggestion.id,
+      before: suggestion,
+      after: null,
+    })),
+    ...gone.map((card): Change => ({
+      entity: 'card',
+      id: card.id,
+      before: card,
+      after: null,
+    })),
+    ...topics.map((topic): Change => ({
+      entity: 'topic',
+      id: topic.id,
+      before: topic,
+      after: null,
+    })),
+  ]
+  return changes.length === 0
+    ? null
+    : store.commit('clear_notes', source, changes)
+}
+
 /** Parks a topic in the Pins rail, answering its pin suggestion if it has one. */
 export function pinTopic(
   store: MapStore,

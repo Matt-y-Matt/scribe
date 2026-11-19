@@ -10,8 +10,13 @@ import {
   type SummaryMeta,
   type SummaryPreset,
 } from '@/engine/summary'
+import { OLLAMA_MODEL } from '@/engine/providers/ollama'
 import type { Turn } from '@/engine/turns'
-import { renderWritten, writeMeetingSummary } from '@/engine/written-summary'
+import {
+  renderWritten,
+  SUMMARY_MODEL,
+  writeMeetingSummary,
+} from '@/engine/written-summary'
 import type { Summary } from '@/ipc'
 import { cn } from '@/lib/utils'
 import { CopyButton } from './CopyButton'
@@ -157,8 +162,10 @@ export function SummaryPanel({
     setFailed(false)
     setUnread(false)
     typed.current = false
-    try {
-      const summary = await writeMeetingSummary(ask, transcript, {
+    // The larger model first; if it is not there, the one the notes use.
+    const read = (model: string) =>
+      writeMeetingSummary(ask, transcript, {
+        model,
         title: meta.title,
         participants: meta.participants,
         agenda: headersOf(state)
@@ -182,6 +189,11 @@ export function SummaryPanel({
           }
         },
         onProgress: (step, of) => setReading({ step, of }),
+      })
+    try {
+      const summary = await read(SUMMARY_MODEL).catch(() => {
+        if (typed.current) throw new Error('the host is writing it')
+        return read(OLLAMA_MODEL)
       })
       if (typed.current) return
       setOwn({
@@ -315,8 +327,8 @@ export function SummaryPanel({
       {reading !== null && (
         <p role="status" className="text-secondary text-text-muted">
           The model on this PC is reading the meeting, part {reading.step} of{' '}
-          {reading.of}. A half-hour meeting takes a minute or two; the text
-          below stays until it is done.
+          {reading.of}. A half-hour meeting takes several minutes; the text
+          below stays until it is done, and you can keep working.
         </p>
       )}
       {unread && !writing && (

@@ -149,7 +149,23 @@ Matt recorded a real 31-minute Discord call on 2026-11-19 (two people, no agenda
 - The headphone leak is still in the transcript. Only near-verbatim repeats are kept from the models; half-cancelled echo is not, and telling it from a quiet talker needs the audio (see `audio/echo.rs`).
 - Speech recognition at 0.63 of real time during the call, against 0.16 to 0.21 in the bench: not looked into.
 - The summary's actions that are not cards are not on the end screen's lists and get no draft. Turning them into cards for the host to tick is the next step.
-- A larger local model for the summary only. `qwen3.5:9b` is 6.6 GB at q4_K_M (ollama.com, 2026-11-19), borderline on the 8 GB card; the summary does not have to be fast. Not tried.
+- A larger local model for the summary only. `qwen3.5:9b` is 6.6 GB at q4_K_M (ollama.com, 2026-11-19), borderline on the 8 GB card; the summary does not have to be fast. Tried the same day: see the next section.
+
+## The map as a board, and the 9B model (2026-11-20)
+
+Matt's screenshots of the Edwin call's map: fifteen topics in one long column, each asking to be pinned, and one wheel notch out emptied every topic to a count. He asked for new topics to open beside the others, for off-agenda and pinned topics to look different, and for whatever models the notes and the summary need.
+
+### What changed
+
+- **Off the agenda, topics sit side by side** (`layout.ts`). Agenda headers stay columns with their topics stacked; the off-agenda area lays each topic out as a column of its own, left to right in the order they came up. Nothing is to the right of that area, so a new topic there moves nothing. With no agenda that area is the whole board and is titled "Topics".
+- **Its own colour** (`--aside`, `--aside-soft` in `tokens.css`). The off-agenda area, pin suggestions and pinned markers are violet. With no agenda nothing is marked, since nothing is off it.
+- **Zoom.** Cards collapse to counts below 0.5, not 0.7: the map opens at 0.8, and one notch went under 0.7. A click on a collapsed topic brings it up at 0.9.
+- **Rebuild notes** (status strip, review only). Takes out every card the note-taker wrote, every suggestion and every topic left empty, then plays the transcript through the note-taker as it is now, one trigger's lines per run. Cards a person added stay. An engine card the host edited goes too: cards do not record who last touched them. The clearing is one undoable step (`clear_notes`).
+- **The summary uses `qwen3.5:9b`** when it is pulled, and the note-taker's model when it is not.
+
+### `qwen3.5:9b` against `qwen3.5:4b`, on the Edwin recording
+
+- Summary: the 9B kept the launch date (5 December), the delivery dates (the 15th to the 21st) and the two decisions right, and named the upload and timeline disagreements as open. It wrote no actions, where the 4B wrote two wrong ones. 476 s for 31 minutes of talk, against about 60 s; Ollama put 5.2 GB of its 6.2 GB on the GPU and the rest on the CPU.
 
 ## After M2 — the screens around a meeting (2026-11-19)
 

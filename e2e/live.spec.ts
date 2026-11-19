@@ -188,14 +188,21 @@ test.describe('viewport stability', () => {
     await expect.poll(() => viewport(page)).not.toBe(before)
 
     const zoomOut = page.getByRole('button', { name: 'Zoom out' })
+    // One notch out still shows the rows.
     await zoomOut.click()
-    await zoomOut.click()
-    // Below 0.7 the rows give way to kind counts; titles stay.
+    await expect(card(page, 'Write the CLA quote')).toHaveCount(1)
+    for (let n = 0; n < 4; n++) await zoomOut.click()
+    // Below 0.5 the rows give way to kind counts; titles stay.
     await expect(card(page, 'Write the CLA quote')).toHaveCount(0)
     await expect(topic(page, 'Pricing').getByTitle('Decision')).toHaveText('2')
     await expect(
       topic(page, 'Pricing').getByRole('heading', { name: 'Pricing' })
     ).toBeVisible()
+
+    // A click on a collapsed topic brings it up to read.
+    await topic(page, 'Pricing').click()
+    await expect(card(page, 'Write the CLA quote')).toHaveCount(1)
+    await expect.poll(() => viewport(page)).toContain('scale(0.9)')
   })
 })
 

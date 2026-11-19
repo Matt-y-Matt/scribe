@@ -9,9 +9,14 @@ import {
 } from '@/engine/model'
 
 // Where everything on the map sits, docs/UI_SPEC.md §2.2. One column per
-// agenda header, left to right in agenda order, then Unplanned once it has a
-// topic. Inside a column the topics stack top to bottom. dagre does both
-// passes: `rankdir: LR` across the columns and `rankdir: TB` within one.
+// agenda header, left to right in agenda order, then the off-agenda area
+// once it has a topic. Inside an agenda column the topics stack top to
+// bottom. Off the agenda each topic is a column of its own, side by side in
+// the order they came up: a new subject opens to the right and the board
+// fills up across, instead of one long list (Matt, 2026-11-20, after a call
+// with no agenda put fifteen topics in one column). Nothing sits to the
+// right of that area, so a new topic there moves nothing. dagre does the
+// passes: `rankdir: LR` across, `rankdir: TB` within a column.
 //
 // The layout is a pure function of the map, the measured heights and the
 // positions the host chose by dragging. A dragged topic stays where it was
@@ -119,6 +124,7 @@ export function layoutMap(
   const headers = visibleHeaders(state)
   const topics: TopicBox[] = []
   const columnHeights = new Map<string, number>()
+  const columnWidths = new Map<string, number>()
 
   for (const header of headers) {
     const rows = topicsUnder(state, header.id).map(topic => ({
@@ -126,34 +132,51 @@ export function layoutMap(
       height: heights.get(topic.id) ?? estimateHeight(state, topic),
     }))
     const flowing = rows.filter(row => !manual[row.topic.id])
-    const offsets = stack(
-      flowing.map(row => ({ id: row.topic.id, size: row.height })),
-      'TB',
-      TOPIC_GAP
-    )
+    const across = header.off_agenda
+    const offsets = across
+      ? stack(
+          flowing.map(row => ({ id: row.topic.id, size: TOPIC_WIDTH })),
+          'LR',
+          COLUMN_GAP
+        )
+      : stack(
+          flowing.map(row => ({ id: row.topic.id, size: row.height })),
+          'TB',
+          TOPIC_GAP
+        )
 
     let bottom = COLUMN_HEADER
+    let right = COLUMN_PADDING + TOPIC_WIDTH
     for (const { topic, height } of rows) {
       const placed = manual[topic.id]
+      const offset = offsets.get(topic.id) ?? 0
       const box: TopicBox = {
         id: topic.id,
         headerId: header.id,
-        x: placed?.x ?? COLUMN_PADDING,
-        y: placed?.y ?? COLUMN_HEADER + (offsets.get(topic.id) ?? 0),
+        x: placed?.x ?? COLUMN_PADDING + (across ? offset : 0),
+        y: placed?.y ?? COLUMN_HEADER + (across ? 0 : offset),
         height,
         manual: placed !== undefined,
       }
       topics.push(box)
       bottom = Math.max(bottom, box.y + height)
+      right = Math.max(right, box.x + TOPIC_WIDTH)
     }
     columnHeights.set(
       header.id,
       rows.length === 0 ? EMPTY_COLUMN : bottom + COLUMN_PADDING
     )
+    columnWidths.set(
+      header.id,
+      across && rows.length > 0 ? right + COLUMN_PADDING : COLUMN_WIDTH
+    )
   }
 
   const offsets = stack(
-    headers.map(header => ({ id: header.id, size: COLUMN_WIDTH })),
+    headers.map(header => ({
+      id: header.id,
+      size: columnWidths.get(header.id) ?? COLUMN_WIDTH,
+    })),
     'LR',
     COLUMN_GAP
   )
@@ -162,7 +185,7 @@ export function layoutMap(
       id: header.id,
       x: offsets.get(header.id) ?? 0,
       y: 0,
-      width: COLUMN_WIDTH,
+      width: columnWidths.get(header.id) ?? COLUMN_WIDTH,
       height: columnHeights.get(header.id) ?? EMPTY_COLUMN,
     })),
     topics,
