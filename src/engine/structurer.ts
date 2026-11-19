@@ -42,6 +42,11 @@ export interface RunRecord {
 export interface StructurerOptions {
   store: MapStore
   provider: StructurerProvider
+  /**
+   * The lines come from speech recognition in a meeting being held, not from
+   * a written fixture: the model is told how to read broken speech.
+   */
+  liveSpeech?: boolean
   /** Never given transcript or card text. */
   log?: (message: string, context: Record<string, unknown>) => void
   onRun?: (run: RunRecord) => void
@@ -51,9 +56,11 @@ export function buildInput(
   state: MapState,
   recent: readonly SegmentFinal[],
   batch: readonly SegmentFinal[],
-  nowMs: number
+  nowMs: number,
+  liveSpeech = false
 ): StructurerInput {
   return {
+    ...(liveSpeech ? { live: true } : {}),
     agenda: headersOf(state)
       .filter(header => !header.off_agenda)
       .map(({ id, title }) => ({ id, title })),
@@ -78,6 +85,8 @@ export function buildInput(
     new_segments: batch.map(segment => ({
       id: segment.id,
       t0: segment.t0_ms,
+      t1: segment.t1_ms,
+      source: segment.source,
       speaker: segment.speaker_label,
       text: segment.text,
     })),
@@ -217,7 +226,13 @@ export class Structurer implements SegmentSink {
     const recent = this.structured.filter(
       segment => segment.t1_ms >= first.t0_ms - RECENT_MS
     )
-    const input = buildInput(this.store.getState(), recent, batch, nowMs)
+    const input = buildInput(
+      this.store.getState(),
+      recent,
+      batch,
+      nowMs,
+      this.options.liveSpeech
+    )
 
     // The model sees short aliases (H1, T3) in place of the map's ids.
     const aliased = aliasInput(input)

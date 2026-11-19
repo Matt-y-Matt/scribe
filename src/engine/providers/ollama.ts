@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { looseJson, modelOutputSchema } from './ai-sdk'
-import { cardsMessage, cardsSchema, cardsToOps } from './cards'
+import { cardsMessage, cardsSchema, cardsToOps, cardTurns } from './cards'
 import type { StructurerInput, StructurerProvider } from './types'
 
 // Ollama, the local default. This talks to Ollama's own `/api/chat` rather
@@ -89,6 +89,8 @@ export function createOllamaProvider(
     // An Ollama on another machine is a cloud provider like any other.
     local: isLoopback(baseUrl),
     async structure(input: StructurerInput, signal?: AbortSignal) {
+      // Nothing but "yeah" and "um" since the last run: no call to make.
+      if (cards && cardTurns(input).length === 0) return { ops: [] }
       const timeout = AbortSignal.timeout(TIMEOUT_MS)
       const send = transport ?? fetchTransport(baseUrl)
       const text = await send(

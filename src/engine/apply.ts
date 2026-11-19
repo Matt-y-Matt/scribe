@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import {
   cardsIn,
+  headersOf,
   topicsUnder,
   unplannedHeader,
   type Card,
@@ -12,6 +13,7 @@ import {
 } from './model'
 import { matchOwner } from './owner'
 import type { MapStore } from './store'
+import { wordOverlap } from './turns'
 
 // The structurer's output and the rules for applying it,
 // docs/ARCHITECTURE.md §3.2. Everything the model returns is a request: the
@@ -117,6 +119,9 @@ const DEFAULT_PIN_REASON = 'Not on the agenda'
 
 const sameTitle = (a: string, b: string) =>
   a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** Two cards in one topic sharing this share of their words are one card. */
+const SAME_TEXT = 0.75
 
 const nextOrder = (rows: readonly { order_key: number }[]) =>
   rows.reduce((max, row) => Math.max(max, row.order_key), -1) + 1
@@ -271,13 +276,17 @@ export function applyOps(
           ? matchOwner(op.owner, state().meeting.participants)
           : null
 
+        const topicId = topic.id
         const duplicate = Object.values(state().cards).some(
           card =>
             card.status !== 'dismissed' &&
             card.kind === op.kind &&
             // Two people can each owe something from the same sentence.
             (!isAction || card.owner === owner) &&
-            cited.every(id => card.segment_ids.includes(id))
+            (cited.every(id => card.segment_ids.includes(id)) ||
+              // People say a thing twice, and a small model notes it twice.
+              (card.topic_id === topicId &&
+                wordOverlap(card.text, op.text) >= SAME_TEXT))
         )
         if (duplicate) return 'duplicate'
 
@@ -382,7 +391,10 @@ export function applyOps(
 
   // An off-agenda topic always comes with a pin suggestion (ARCHITECTURE
   // §3.2). The model's own, if it sent one, was applied above and wins.
-  for (const topic of createdOffAgenda) {
+  // A meeting with no agenda has nothing to be off: every topic would ask to
+  // be pinned, so none does.
+  const hasAgenda = headersOf(state()).some(header => !header.off_agenda)
+  for (const topic of hasAgenda ? createdOffAgenda : []) {
     const suggested = alreadySuggested(
       payload => payload.kind === 'pin' && payload.topic_id === topic.id
     )

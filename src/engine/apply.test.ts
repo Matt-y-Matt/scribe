@@ -10,8 +10,9 @@ import {
   unplannedHeader,
   type MapState,
 } from './model'
-import type { MapStore } from './store'
-import { headerNamed, testSegments, testStore } from './testing'
+import { countingSource } from './ids'
+import { MapStore } from './store'
+import { headerNamed, TEST_MEETING, testSegments, testStore } from './testing'
 
 const context = (overrides: Partial<ApplyContext> = {}): ApplyContext => ({
   tMs: 60_000,
@@ -45,7 +46,8 @@ const allCards = (state: MapState) => Object.values(state.cards)
 const note = (segmentIds: string[], extra: object = {}) => ({
   op: 'add_card',
   kind: 'note',
-  text: 'A note',
+  // Its own words each time: the same line twice in one topic is a repeat.
+  text: `A note on ${segmentIds.join(' ')}`,
   segment_ids: segmentIds,
   ...extra,
 })
@@ -404,6 +406,34 @@ describe('applyOps', () => {
         },
       ])
     })
+
+    it('do not ask to be pinned in a meeting that has no agenda', () => {
+      // With no agenda every topic is off it; a pin on each means nothing.
+      const store = new MapStore({
+        meeting: TEST_MEETING,
+        agenda: [],
+        ids: countingSource(),
+      })
+      applyOps(
+        store,
+        [
+          {
+            op: 'add_topic',
+            tmp_key: 'a',
+            title: 'Launch date',
+            off_agenda: true,
+          },
+          { op: 'add_topic', tmp_key: 'b', title: 'Pricing', off_agenda: true },
+          note(['s001'], { tmp_topic: 'a' }),
+        ],
+        context()
+      )
+      const state = store.getState()
+      expect(
+        topicsUnder(state, unplannedHeader(state)?.id ?? '').map(t => t.title)
+      ).toEqual(['Launch date', 'Pricing'])
+      expect(openSuggestions(state)).toEqual([])
+    })
   })
 
   describe('owners', () => {
@@ -413,7 +443,7 @@ describe('applyOps', () => {
         op: 'add_card',
         topic_id: pricing.id,
         kind: 'action',
-        text: 'Call Ross',
+        text: `Call Ross about ${segment}`,
         owner,
         due_text: ' tomorrow ',
         segment_ids: [segment],
@@ -492,6 +522,30 @@ describe('applyOps', () => {
         [2, 'duplicate'],
       ])
       expect(cardsIn(store.getState(), pricing.id)).toHaveLength(3)
+    })
+
+    it('drops a card that says again what a card in its topic says', () => {
+      const { store, cla, pricing } = setUp()
+      const { dropped } = applyOps(
+        store,
+        [
+          note(['s006'], { topic_id: pricing.id, text: 'Send all the photos' }),
+          // Other lines of the meeting, the same words: a repeat.
+          note(['s009'], { topic_id: pricing.id, text: 'Send all photos.' }),
+          // Its own point, though it shares words: kept.
+          note(['s010'], {
+            topic_id: pricing.id,
+            text: 'Send the photos of the yellow jersey by Friday',
+          }),
+          // The same words under another topic: kept.
+          note(['s011'], { topic_id: cla.id, text: 'Send all the photos' }),
+        ],
+        context()
+      )
+      expect(dropped.map(drop => [drop.index, drop.reason])).toEqual([
+        [1, 'duplicate'],
+      ])
+      expect(cardsIn(store.getState(), pricing.id)).toHaveLength(2)
     })
 
     it('keeps two actions from one sentence when the owners differ', () => {

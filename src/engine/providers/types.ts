@@ -17,9 +17,22 @@ export interface StructurerInput {
   }[]
   /** The last 90 s of transcript already structured, for continuity. */
   recent_structured: string
-  new_segments: { id: string; t0: number; speaker: string; text: string }[]
+  new_segments: {
+    id: string
+    t0: number
+    /** When the line ended, and where it was heard (`laptop`, `system`). */
+    t1?: number
+    source?: string
+    speaker: string
+    text: string
+  }[]
   participants: string[]
   now_ms: number
+  /**
+   * The transcript comes from speech recognition in a meeting being held:
+   * broken lines, repeats, mis-heard words. A replayed fixture is not.
+   */
+  live?: boolean
 }
 
 export interface StructurerProvider {

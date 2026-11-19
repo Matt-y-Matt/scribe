@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { cardsMessage, cardsSchema, cardsToOps, OFF_AGENDA } from './cards'
+import {
+  cardsMessage,
+  cardsSchema,
+  cardsToOps,
+  LIVE_RULES,
+  OFF_AGENDA,
+} from './cards'
 import type { StructurerInput } from './types'
 
 // The input as the structurer hands it over: ids already aliased.
@@ -113,6 +119,120 @@ describe('cardsMessage', () => {
     expect(text).toContain('Under H1 (CLA quote): none yet')
     expect(text).toContain('Off the agenda (OFF): none yet')
     expect(text).toContain('(nothing yet)')
+  })
+})
+
+// A call as the recorder cuts it: fragments, filler, and the other side's
+// voice coming back through the microphone.
+const LIVE: StructurerInput = {
+  ...INPUT,
+  agenda: [],
+  outline: [],
+  recent_structured: '',
+  new_segments: [
+    {
+      id: 'a1',
+      t0: 0,
+      t1: 1_500,
+      source: 'laptop',
+      speaker: 'Matt',
+      text: 'So the launch',
+    },
+    {
+      id: 'b1',
+      t0: 1_600,
+      t1: 2_200,
+      source: 'system',
+      speaker: 'Zach',
+      text: 'Yeah.',
+    },
+    {
+      id: 'a2',
+      t0: 2_300,
+      t1: 4_000,
+      source: 'laptop',
+      speaker: 'Matt',
+      text: 'has to be by the fifth.',
+    },
+    {
+      id: 'a3',
+      t0: 4_200,
+      t1: 4_800,
+      source: 'laptop',
+      speaker: 'Matt',
+      text: 'Um',
+    },
+    {
+      id: 'b2',
+      t0: 9_000,
+      t1: 12_000,
+      source: 'system',
+      speaker: 'Zach',
+      text: 'Factories need two weeks notice.',
+    },
+    {
+      id: 'a4',
+      t0: 9_400,
+      t1: 12_300,
+      source: 'laptop',
+      speaker: 'Matt',
+      text: 'Factories need two weeks notice',
+    },
+  ],
+}
+
+describe('the card protocol on live speech', () => {
+  it('shows the model turns: fragments joined, filler and echo left out', () => {
+    const shown = cardsMessage(LIVE).split('NEW SEGMENTS\n')[1]
+    expect(shown).toBe(
+      [
+        '[a1] Matt: So the launch has to be by the fifth.',
+        '[b2] Zach: Factories need two weeks notice.',
+      ].join('\n')
+    )
+    const schema = cardsSchema(LIVE) as {
+      properties: {
+        segments: { items: { properties: { id: { enum: string[] } } } }
+      }
+    }
+    expect(schema.properties.segments.items.properties.id.enum).toEqual([
+      'a1',
+      'b2',
+    ])
+  })
+
+  it('tells the model how to read live speech, in a live meeting only', () => {
+    const live = { ...LIVE, live: true }
+    expect(cardsMessage(live).endsWith(LIVE_RULES)).toBe(true)
+    expect(cardsMessage(LIVE)).not.toContain('LIVE TRANSCRIPT')
+    // The fixture the golden test replays is read exactly as before.
+    expect(cardsMessage(INPUT)).not.toContain('LIVE TRANSCRIPT')
+
+    const types = (input: StructurerInput) =>
+      (
+        cardsSchema(input) as {
+          properties: {
+            segments: { items: { properties: { type: { enum: string[] } } } }
+          }
+        }
+      ).properties.segments.items.properties.type.enum
+    expect(types(live)).toEqual(['new', 'recap', 'agenda', 'other', 'unclear'])
+    expect(types(LIVE)).toEqual(['new', 'recap', 'agenda', 'other'])
+  })
+
+  it('cites every line of the turn a card was written from', () => {
+    const { ops } = cardsToOps(
+      {
+        segments: [
+          entry('a1', OFF_AGENDA, 'Launch', [card('Launch by the 5th')]),
+        ],
+      },
+      LIVE
+    )
+    expect(ops).toMatchObject([
+      { op: 'add_topic', segment_ids: ['a1', 'a2'] },
+      { op: 'add_card', segment_ids: ['a1', 'a2'] },
+    ])
   })
 })
 
@@ -240,6 +360,21 @@ describe('cardsToOps', () => {
       parent_id: null,
       off_agenda: true,
     })
+  })
+
+  it('takes no cards from a segment the model could not make sense of', () => {
+    const { ops } = cardsToOps(
+      {
+        segments: [
+          {
+            ...entry('s017', 'H2', 'Lead times', [card('x')]),
+            type: 'unclear',
+          },
+        ],
+      },
+      INPUT
+    )
+    expect(ops).toEqual([])
   })
 
   it('gives no ops for a reply in another shape', () => {

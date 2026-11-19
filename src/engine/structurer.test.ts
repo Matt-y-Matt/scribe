@@ -297,6 +297,8 @@ describe('buildInput', () => {
     expect(input?.new_segments[0]).toEqual({
       id: 's006',
       t0: 50_000,
+      t1: 59_500,
+      source: 'laptop',
       speaker: 'Matt',
       text: words(10),
     })

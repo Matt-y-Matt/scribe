@@ -19,7 +19,9 @@ const INPUT: StructurerInput = {
   agenda: [{ id: 't_A', title: 'CLA quote' }],
   outline: [],
   recent_structured: '',
-  new_segments: [{ id: 's001', t0: 0, speaker: 'Matt', text: 'Hello' }],
+  new_segments: [
+    { id: 's001', t0: 0, speaker: 'Matt', text: 'The quote is 42 a set.' },
+  ],
   participants: ['Matt'],
   now_ms: 1000,
 }

@@ -13,6 +13,8 @@ const fixtureSegmentSchema = z
     t0: z.number().nonnegative(),
     t1: z.number().nonnegative(),
     speaker: z.string().min(1),
+    /** Where it was heard; a transcript exported from a real call has both. */
+    source: z.enum(['laptop', 'system']).optional(),
     text: z.string().min(1),
   })
   .refine(segment => segment.t1 >= segment.t0, {
@@ -89,7 +91,8 @@ const toMs = (seconds: number) => Math.round(seconds * 1000)
 /**
  * Turns a fixture row into the `segment:final` payload the Rust core sends.
  * Fixture ids are kept because the golden expectations refer to them. A
- * replay has no microphone, so `source` is the laptop and `confidence` is 1.
+ * replay has no microphone, so `source` is the laptop unless the row says
+ * otherwise, and `confidence` is 1.
  */
 export function toSegmentFinal(
   segment: FixtureSegment,
@@ -101,7 +104,7 @@ export function toSegmentFinal(
     t0_ms: toMs(segment.t0),
     t1_ms: toMs(segment.t1),
     speaker_label: segment.speaker,
-    source: 'laptop',
+    source: segment.source ?? 'laptop',
     text: segment.text,
     confidence: 1,
   }

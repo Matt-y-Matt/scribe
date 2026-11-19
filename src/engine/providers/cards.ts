@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { toTurns, type Turn } from '../turns'
 import type { StructurerInput } from './types'
 
 // The card protocol: the structurer's task cut down to what a small local
@@ -10,6 +11,11 @@ import type { StructurerInput } from './types'
 // to, then the cards. This file turns that into the ops the engine's rules
 // judge, and takes cards only from segments the model called new.
 //
+// What the model walks through are turns, not the recorder's lines (turns.ts):
+// live speech arrives in fragments of four or five words, and a card per
+// fragment is a paraphrase of the transcript, not a note. A card written from
+// a turn cites every line the turn covers.
+//
 // The schema is built per request, so a grammar-constrained model (Ollama
 // `format`) cannot name a segment, a header or an owner that does not exist.
 
@@ -19,6 +25,34 @@ const FALLBACK_TITLE = 'General'
 
 /** What a segment is. Only `new` segments give cards. */
 export const SEGMENT_TYPES = ['new', 'recap', 'agenda', 'other'] as const
+/**
+ * Live speech only: too broken or mis-heard to say what was meant. A bin of
+ * its own, so a model is not tempted to write a card from it.
+ */
+export const UNCLEAR = 'unclear'
+
+/**
+ * What a model is told about live speech, at the end of the message where a
+ * small model weighs it most. It is not in the system prompt: that prompt is
+ * what the golden test passes with, and a 4B model's filing of a clean
+ * transcript changes with almost any sentence added to it (docs/NOTES.md,
+ * 2026-11-20). A replayed fixture never gets this section.
+ */
+export const LIVE_RULES = [
+  'THIS IS A LIVE TRANSCRIPT',
+  'It was made by speech recognition while people talk. Lines break off, repeat themselves and mis-hear words. For the segments above:',
+  '- Write a card only when you can say what the person meant in a line that stands by itself. Thinking aloud, starting over, and a question nobody answers give no card.',
+  `- Never copy a word or a number that makes no sense where it stands. Leave that part out. If nothing clear is left, the segment's type is "${UNCLEAR}" and it has no cards.`,
+  '- When someone asks the person they are talking to ("can you send me the file tonight?"), the action belongs to the person asked, never to the speaker.',
+  '- `Room` and `System audio` are not people. An action from such a line has owner null unless a name is said.',
+  '- Do not write a card that says again what a topic already holds.',
+  '- When there is no agenda, every header is OFF: give each subject one topic title and keep using it.',
+].join('\n')
+
+/** The new segments as the model is shown them. Empty when all is filler. */
+export function cardTurns(input: StructurerInput): Turn[] {
+  return toTurns(input.new_segments)
+}
 
 /** JSON Schema for the reply to this input. */
 export function cardsSchema(input: StructurerInput): Record<string, unknown> {
@@ -37,9 +71,14 @@ export function cardsSchema(input: StructurerInput): Record<string, unknown> {
           properties: {
             id: {
               type: 'string',
-              enum: input.new_segments.map(segment => segment.id),
+              enum: cardTurns(input).map(turn => turn.id),
             },
-            type: { type: 'string', enum: [...SEGMENT_TYPES] },
+            type: {
+              type: 'string',
+              enum: input.live
+                ? [...SEGMENT_TYPES, UNCLEAR]
+                : [...SEGMENT_TYPES],
+            },
             header: {
               type: 'string',
               enum: [...input.agenda.map(header => header.id), OFF_AGENDA],
@@ -106,10 +145,11 @@ export function cardsMessage(input: StructurerInput): string {
     input.recent_structured || '(nothing yet)',
     '',
     'NEW SEGMENTS',
-    ...input.new_segments.map(
-      segment => `[${segment.id}] ${segment.speaker}: ${segment.text}`
+    ...cardTurns(input).map(
+      turn => `[${turn.id}] ${turn.speaker}: ${turn.text}`
     )
   )
+  if (input.live) lines.push('', LIVE_RULES)
   return lines.join('\n')
 }
 
@@ -162,6 +202,8 @@ export function cardsToOps(
   if (!parsed.success) return { ops: [] }
 
   const headerIds = new Set(input.agenda.map(header => header.id))
+  /** The lines each turn covers; a card cites all of them. */
+  const covers = new Map(cardTurns(input).map(turn => [turn.id, turn.covers]))
   /** Topics this reply adds: where they go, and the op that adds them. */
   const added: {
     key: string
@@ -175,6 +217,7 @@ export function cardsToOps(
     // A recap, the agenda and small talk give no cards, whatever was written.
     if (segment.type !== 'new' || segment.cards.length === 0) continue
 
+    const cited = covers.get(segment.id) ?? [segment.id]
     const header = headerIds.has(segment.header) ? segment.header : OFF_AGENDA
     const offAgenda = header === OFF_AGENDA
     const title = segment.topic.trim() || FALLBACK_TITLE
@@ -208,8 +251,8 @@ export function cardsToOps(
         // The topic goes in just ahead of its first card.
         ops.push(fresh.op)
       }
-      if (!fresh.op.segment_ids.includes(segment.id)) {
-        fresh.op.segment_ids.push(segment.id)
+      for (const id of cited) {
+        if (!fresh.op.segment_ids.includes(id)) fresh.op.segment_ids.push(id)
       }
       topicRef = fresh.key
     }
@@ -222,7 +265,7 @@ export function cardsToOps(
         text: card.text,
         owner: card.owner ?? null,
         due_text: card.due_text ?? null,
-        segment_ids: [segment.id],
+        segment_ids: [...cited],
       })
     }
   }

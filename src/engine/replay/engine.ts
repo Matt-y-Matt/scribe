@@ -24,6 +24,8 @@ export interface EngineReplayOptions extends ReplayOptions {
    * `speed` and `clock` are ignored.
    */
   paced?: boolean
+  /** The transcript is a recorded meeting's, not a written fixture's. */
+  liveSpeech?: boolean
   /** A second sink that hears the same segments, e.g. the console. */
   also?: SegmentSink
   onRun?: (run: RunRecord) => void
@@ -61,9 +63,15 @@ export async function replayIntoEngine(
   provider: StructurerProvider,
   options: EngineReplayOptions = {}
 ): Promise<EngineReplay> {
-  const { ids, also, onRun, log, paced, ...replayOptions } = options
+  const { ids, also, onRun, log, paced, liveSpeech, ...replayOptions } = options
   const store = storeForFixture(meta, replayOptions.meetingId, ids)
-  const structurer = new Structurer({ store, provider, onRun, log })
+  const structurer = new Structurer({
+    store,
+    provider,
+    onRun,
+    log,
+    liveSpeech,
+  })
 
   const summary = await replay(
     segments,
